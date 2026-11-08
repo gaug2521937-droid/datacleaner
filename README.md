@@ -84,7 +84,11 @@ datacleaner/
 │       ├── 03-ui.js              рендеринг: KPI, кольцо, воронка, график, дедлайны, SMTP, AI
 │       └── 04-actions.js         действия, модалки, AI-поток, «Самопроверка», запуск
 ├── tools/
-│   └── build_html.py             сборка datacleaner.html и app/static/index.html
+│   ├── build_html.py             сборка datacleaner.html и app/static/index.html
+│   ├── run_ui_server.sh          локальный сервер для UI-проверок (DRY_RUN=1, база в /tmp)
+│   ├── ui_smoke.py               дымовой UI-тест в Chromium (6 экранов + телефон 390 px)
+│   └── deploy_render.py          деплой на Render через REST API
+├── screens/                      скриншоты интерфейса (десктоп и телефон)
 └── tests/
     └── test_app.py               41 pytest-тест серверной части
 ```
@@ -336,6 +340,9 @@ LLM_MODEL=gpt-6-luna
 - [ ] `POST /api/wipe {"confirm":"DELETE"}` → всё пусто, `/api/stats` показывает 0.
 - [ ] Открыть `datacleaner.html` с `file://` при работающем сервере → остаётся `LOCAL`
       (файл не привязан к серверу — так и задумано).
+- [ ] Автопроверка интерфейса: `bash tools/run_ui_server.sh &` затем `python3 tools/ui_smoke.py`
+      → «ИТОГ: OK», скриншоты в `screens/`, ни одной ошибки JS и ни одной горизонтальной прокрутки
+      на 390 px.
 
 ---
 
