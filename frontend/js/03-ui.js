@@ -246,7 +246,11 @@
       ? 'Черновики уходят сами, а операторам, которые молчат дольше ' + (ap.followup_days || 30) + ' дней, уходит повторное требование.'
       : 'Включите автопилот — DataCleaner сам отправит черновики и напомнит операторам, которые молчат дольше срока.';
     var smtpEl = $('#pilot-smtp');
-    smtpEl.textContent = ready ? (state.settings.resolved.from_addr || 'настроена') : 'не настроена';
+    var tr = (state.settings && state.settings.transport) || {};
+    var label = tr.kind === 'brevo' || tr.kind === 'resend'
+      ? 'HTTPS-API'
+      : (ready ? (state.settings.resolved.from_addr || 'настроена') : 'не настроена');
+    smtpEl.textContent = label;
     smtpEl.style.color = ready ? 'var(--mint)' : 'var(--amber)';
   }
 
@@ -272,7 +276,9 @@
       ? [
         ['Режим', 'серверный (FastAPI + SQLite)'],
         ['Шифрование ПД', 'Fernet, ключ из DATA_KEY'],
-        ['Отправка писем', state.serverMeta.dry_run ? 'DRY_RUN=1 — письма не уходят' : 'реальная отправка через SMTP'],
+        ['Отправка писем', state.serverMeta.dry_run
+          ? 'DRY_RUN=1 — письма не уходят'
+          : 'реальная отправка: ' + (((state.settings || {}).transport || {}).label || 'SMTP')],
         ['SMTP', (state.settings.resolved && state.settings.resolved.ready) ? 'настроен' : 'не настроен'],
         ['AI', state.serverMeta.llm_configured ? 'подключён' : 'не настроен'],
         ['Запросов', String(state.requests.length)]
@@ -431,11 +437,114 @@
     chip.className = 'status-chip ' + (on ? 'live' : '');
     chip.innerHTML = '<span class="dot"></span><span class="txt">' + (on ? 'включён' : 'выключен') + '</span>';
 
-    $('#smtp-status').innerHTML = resolved.ready
-      ? '<span style="color:var(--mint)">Готово к отправке:</span> ' + esc(resolved.from_addr) + ' через ' + esc(resolved.host) + ':' + esc(String(resolved.port))
-      : '<span style="color:var(--amber)">Почта не подключена.</span> Укажите сервер, логин и пароль приложения — после этого заработает автоотправка.';
-
+    renderGoogleCard();
+    renderMailStatus();
+    renderDryRunTip();
     renderPilotLog();
+  }
+
+  /* Вход через Google: подключено / можно подключить / сервер не настроен */
+  function renderGoogleCard() {
+    if (!$('#google-card')) return;
+    var s = state.settings || {};
+    var g = s.google || {};
+    var kind = (s.transport || {}).kind || 'none';
+    var stateEl = $('#google-state');
+    var accEl = $('#google-account');
+    var hintEl = $('#google-hint');
+    var noteEl = $('#google-note');
+    var connectBtn = $('#google-connect');
+    var disconnectBtn = $('#google-disconnect');
+
+    if (g.connected) {
+      stateEl.className = 'pill ok';
+      stateEl.textContent = kind === 'google' ? 'письма идут через Google' : 'подключено';
+      accEl.textContent = g.email || 'аккаунт Google подключён';
+      hintEl.textContent = g.connected_at ? 'подключён ' + fmtDateTime(g.connected_at) : 'подключён';
+      connectBtn.textContent = 'Переподключить';
+      connectBtn.classList.remove('primary');
+      disconnectBtn.style.display = '';
+      noteEl.innerHTML = 'Письма отправляются с этого ящика. Отключить доступ можно здесь или в ' +
+        '<a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer">настройках аккаунта Google</a>.';
+    } else if (g.configured) {
+      stateEl.className = 'pill warn';
+      stateEl.textContent = 'не подключено';
+      accEl.textContent = 'Аккаунт Google не подключён';
+      hintEl.textContent = 'вход в один клик';
+      connectBtn.textContent = 'Войти через Google';
+      connectBtn.classList.add('primary');
+      disconnectBtn.style.display = 'none';
+      noteEl.innerHTML = 'Нажмите кнопку и введите свой обычный пароль Google на странице Google — ' +
+        'приложение его не видит и не хранит, сохраняется только токен доступа (зашифрованный).';
+    } else {
+      stateEl.className = 'pill neutral';
+      stateEl.textContent = 'нужна настройка';
+      accEl.textContent = 'Вход через Google не настроен на сервере';
+      hintEl.textContent = 'нужны GOOGLE_CLIENT_ID и GOOGLE_CLIENT_SECRET';
+      connectBtn.textContent = 'Как включить';
+      connectBtn.classList.add('primary');
+      disconnectBtn.style.display = 'none';
+      noteEl.innerHTML = 'Владельцу сервиса нужно один раз создать OAuth-клиент в Google Cloud ' +
+        '(Gmail API + redirect URI <span class="code">' + esc(g.redirect_uri || '/api/mail/google/callback') +
+        '</span>) и добавить в переменные окружения <span class="code">GOOGLE_CLIENT_ID</span> и ' +
+        '<span class="code">GOOGLE_CLIENT_SECRET</span>.';
+    }
+  }
+
+  /* Статус транспорта: SMTP или HTTPS-API провайдера (для хостингов, где SMTP закрыт) */
+  function renderMailStatus() {
+    var s = state.settings || {};
+    var resolved = s.resolved || {};
+    var tr = s.transport || {};
+    var kind = tr.kind || (resolved.ready ? 'smtp' : 'none');
+    var lines = [];
+
+    if (kind === 'smtp') {
+      lines.push('<span style="color:var(--mint)">SMTP готов:</span> ' + esc(resolved.from_addr || '') +
+        ' через ' + esc(resolved.host || '') + ':' + esc(String(resolved.port || '')));
+      var port = Number(resolved.port || 0);
+      if (port === 25 || port === 465 || port === 587) {
+        lines.push('<span style="color:var(--amber)">Важно про хостинг:</span> бесплатный Render блокирует исходящий ' +
+          'SMTP на портах 25/465/587 — письма там не уйдут. Варианты: порт <b>2525</b> у провайдера ' +
+          '(Brevo/SendGrid) или HTTPS-API (переменные <span class="code">BREVO_API_KEY</span> / ' +
+          '<span class="code">RESEND_API_KEY</span> + <span class="code">EMAIL_FROM</span>). На своём ПК/VPS порт ' +
+          esc(String(port)) + ' работает как обычно.');
+      }
+    } else if (kind === 'google') {
+      lines.push('<span style="color:var(--mint)">Отправка через Gmail API:</span> ' + esc(tr.from_addr || 'аккаунт Google') +
+        '. SMTP и пароли приложений не нужны — используется вход через Google (OAuth 2.0), HTTPS-порт 443.');
+    } else if (kind === 'brevo' || kind === 'resend') {
+      lines.push('<span style="color:var(--mint)">Отправка через HTTPS-API:</span> ' + esc(tr.label || kind) +
+        '. SMTP не нужен, ключ задан в переменных окружения, адрес отправителя — ' + esc(tr.from_addr || 'EMAIL_FROM') + '.');
+    } else {
+      lines.push('<span style="color:var(--amber)">Почта не подключена.</span> Быстрее всего — «Войти через Google» ' +
+        'выше (без паролей приложений). Альтернативы: SMTP с паролем приложения ниже, либо ' +
+        '<span class="code">BREVO_API_KEY</span> / <span class="code">RESEND_API_KEY</span> и ' +
+        '<span class="code">EMAIL_FROM</span> в переменных окружения хостинга.');
+    }
+    (tr.notes || []).forEach(function (n) {
+      if (kind === 'none' && /^Почта не подключена/.test(n)) return; /* уже сказано выше */
+      lines.push('<span class="muted">' + esc(n) + '</span>');
+    });
+    $('#smtp-status').innerHTML = lines.join('<br>');
+  }
+
+  /* Подсказка про DRY_RUN: меняется в зависимости от окружения */
+  function renderDryRunTip() {
+    var el = $('#dry-run-tip');
+    if (!el) return;
+    if (!state.server) {
+      el.innerHTML = 'В браузерном режиме письма не отправляются автоматически: текст копируется в ваш ' +
+        'почтовый клиент. Реальная автоотправка — в серверной версии (FastAPI) с подключённой почтой.';
+      return;
+    }
+    var dry = !!(state.serverMeta && state.serverMeta.dry_run);
+    el.innerHTML = dry
+      ? 'Сейчас <span class="code">DRY_RUN=1</span>: автопилот собирает письма, но не отправляет. ' +
+        'Чтобы письма реально уходили: подключите почту выше и поставьте <span class="code">DRY_RUN=0</span> ' +
+        'в переменных окружения хостинга (Render → Environment), затем перезапустите сервис.'
+      : 'Сейчас <span class="code">DRY_RUN=0</span>: письма уходят по-настоящему. Автопилот отправит новые ' +
+        'черновики и одно напоминание по каждому молчащему оператору.';
   }
 
   function applySmtpPreset() {

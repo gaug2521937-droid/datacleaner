@@ -425,3 +425,243 @@ def test_health_reports_autopilot_and_version():
     assert body["version"].startswith("1.")
     assert body["autopilot"]["followup_days"] == 30
     assert body["dry_run"] is True
+
+
+# ------------------------------------------- транспорт почты: HTTPS-API провайдеров
+class _FakeResponse:
+    def __init__(self, status_code: int, payload: dict | None = None):
+        self.status_code = status_code
+        self._payload = payload or {}
+
+    def json(self):
+        return self._payload
+
+
+def test_mail_transport_detection(monkeypatch):
+    from app import mailer
+
+    for name in ("BREVO_API_KEY", "RESEND_API_KEY", "MAIL_PROVIDER", "EMAIL_FROM", "SMTP_FROM"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("SMTP_HOST", "smtp.example.com")
+    monkeypatch.setenv("SMTP_FROM", "me@example.com")
+    assert mailer.transport() == "smtp"
+
+    monkeypatch.setenv("BREVO_API_KEY", "xkeysib-test")
+    monkeypatch.setenv("EMAIL_FROM", "me@example.com")
+    assert mailer.transport() == "brevo"
+    assert mailer.mail_ready() is True
+    assert mailer.transport_info()["kind"] == "brevo"
+
+    monkeypatch.setenv("MAIL_PROVIDER", "smtp")  # явный выбор важнее автоопределения
+    assert mailer.transport() == "smtp"
+
+    monkeypatch.delenv("SMTP_HOST")
+    monkeypatch.setenv("MAIL_PROVIDER", "smtp")
+    assert mailer.transport() == "none"
+    assert mailer.mail_ready() is False
+    assert mailer.transport_info()["notes"]  # подсказка, что именно не настроено
+
+
+def test_brevo_http_send_payload(monkeypatch):
+    from app import mailer
+
+    monkeypatch.setenv("BREVO_API_KEY", "xkeysib-test")
+    monkeypatch.setenv("EMAIL_FROM", "ivan@example.com")
+    monkeypatch.setenv("EMAIL_FROM_NAME", "DataCleaner")
+    monkeypatch.delenv("RESEND_API_KEY", raising=False)
+    captured = {}
+
+    def fake_post(url, payload, headers):
+        captured.update({"url": url, "json": payload, "headers": headers})
+        return _FakeResponse(201, {"messageId": "<abc@brevo>"})
+
+    monkeypatch.setattr("app.mailer._http_post_json", fake_post)
+    result = mailer.send_email("dpo@spokeo.com", "Erasure request", "Text", reply_to="ivan@example.com",
+                               force_dry_run=False)
+    assert result["ok"] is True and result["transport"] == "brevo"
+    assert captured["url"].endswith("/v3/smtp/email")
+    assert captured["headers"]["api-key"] == "xkeysib-test"
+    assert captured["json"]["sender"]["email"] == "ivan@example.com"
+    assert captured["json"]["to"] == [{"email": "dpo@spokeo.com"}]
+    assert captured["json"]["textContent"] == "Text"  # только plain-text, без HTML
+    assert captured["json"]["replyTo"] == {"email": "ivan@example.com"}
+
+
+def test_resend_http_send_and_errors(monkeypatch):
+    from app import mailer
+
+    monkeypatch.delenv("BREVO_API_KEY", raising=False)
+    monkeypatch.setenv("RESEND_API_KEY", "re_test")
+    monkeypatch.setenv("EMAIL_FROM", "ivan@example.com")
+    seen = {}
+
+    def fake_post(url, payload, headers):
+        seen.update({"url": url, "headers": headers, "json": payload})
+        return _FakeResponse(200, {"id": "msg-1"})
+
+    monkeypatch.setattr("app.mailer._http_post_json", fake_post)
+    ok = mailer.send_email("dpo@example.com", "Subject", "Body", force_dry_run=False)
+    assert ok["ok"] is True and ok["message_id"] == "msg-1"
+    assert seen["headers"]["Authorization"] == "Bearer re_test"
+    assert "text" in seen["json"]
+
+    def unauthorized(url, payload, headers):
+        return _FakeResponse(401, {"message": "Key not valid"})
+
+    monkeypatch.setattr("app.mailer._http_post_json", unauthorized)
+    bad = mailer.send_email("dpo@example.com", "Subject", "Body", force_dry_run=False)
+    assert bad["ok"] is False and "401" in bad["detail"]
+
+
+def test_dry_run_never_touches_network(monkeypatch):
+    from app import mailer
+
+    monkeypatch.setenv("BREVO_API_KEY", "xkeysib-test")
+    monkeypatch.setenv("EMAIL_FROM", "ivan@example.com")
+    monkeypatch.setenv("DRY_RUN", "1")
+
+    def boom(*args, **kwargs):
+        raise AssertionError("в DRY_RUN сеть трогать нельзя")
+
+    monkeypatch.setattr("app.mailer._http_post_json", boom)
+    result = mailer.send_email("dpo@example.com", "S", "B")
+    assert result["ok"] is True and result["dry_run"] is True
+
+
+def test_smtp_blocked_port_hint_in_error(monkeypatch):
+    from app import mailer
+
+    cfg = {"host": "smtp.gmail.com", "port": 587, "user": "me@example.com", "password": "x",
+           "from_addr": "me@example.com", "from_name": "DataCleaner",
+           "use_ssl": False, "use_starttls": True}
+    for name in ("BREVO_API_KEY", "RESEND_API_KEY", "MAIL_PROVIDER"):
+        monkeypatch.delenv(name, raising=False)
+
+    import smtplib
+
+    def refuse(*args, **kwargs):
+        raise OSError("Connection refused")
+
+    monkeypatch.setattr(smtplib, "SMTP", refuse)
+    result = mailer.send_email("dpo@example.com", "S", "B", force_dry_run=False, cfg=cfg)
+    assert result["ok"] is False
+    assert "2525" in result["detail"] and "BREVO_API_KEY" in result["detail"]
+
+
+def test_health_reports_mail_transport(monkeypatch):
+    body = client.get("/api/health").json()
+    assert body["mail_transport"] in ("smtp", "brevo", "resend", "none")
+    assert "mail_ready" in body
+
+
+def test_settings_expose_transport_without_secrets(monkeypatch):
+    monkeypatch.setenv("BREVO_API_KEY", "xkeysib-secret")
+    monkeypatch.setenv("EMAIL_FROM", "ivan@example.com")
+    body = client.get("/api/settings").json()
+    assert body["transport"]["kind"] == "brevo"
+    assert body["resolved"]["ready"] is True
+    assert "xkeysib-secret" not in str(body)
+
+
+# --------------------------------------------- вход через Google (OAuth, без паролей приложений)
+def _oauth_env(monkeypatch):
+    monkeypatch.setenv("GOOGLE_CLIENT_ID", "1234.apps.googleusercontent.com")
+    monkeypatch.setenv("GOOGLE_CLIENT_SECRET", "GOCSPX-test")
+
+
+def test_google_status_not_configured(monkeypatch):
+    for name in ("GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"):
+        monkeypatch.delenv(name, raising=False)
+    body = client.get("/api/mail/google/status").json()
+    assert body["ok"] is True and body["configured"] is False and body["connected"] is False
+
+
+def test_google_start_returns_auth_url(monkeypatch):
+    _oauth_env(monkeypatch)
+    body = client.post("/api/mail/google/start").json()
+    assert body["ok"] is True
+    url = body["auth_url"]
+    assert url.startswith("https://accounts.google.com/o/oauth2/v2/auth?")
+    assert "gmail.send" in url and "access_type=offline" in url and "state=" in url
+    assert "client_secret" not in url  # секрет не должен утечь в браузер
+
+
+def test_google_callback_stores_encrypted_tokens(monkeypatch):
+    from app import db, google_oauth
+
+    _oauth_env(monkeypatch)
+    started = client.post("/api/mail/google/start").json()
+    state = started["auth_url"].split("state=")[1].split("&")[0]
+
+    def fake_post(url, data):
+        assert url == "https://oauth2.googleapis.com/token"
+        assert data["grant_type"] == "authorization_code"
+        assert data["code"] == "test-code"
+        return _FakeResponse(200, {"access_token": "ya29.access", "refresh_token": "1//refresh",
+                                   "expires_in": 3599, "scope": "https://www.googleapis.com/auth/gmail.send"})
+
+    def fake_get(url, headers):
+        return _FakeResponse(200, {"emailAddress": "ivan@gmail.com"})
+
+    monkeypatch.setattr("app.google_oauth._post_form", fake_post)
+    monkeypatch.setattr("app.google_oauth._get", fake_get)
+
+    resp = client.get(f"/api/mail/google/callback?code=test-code&state={state}", follow_redirects=False)
+    assert resp.status_code == 303
+    assert "mail=google_ok" in resp.headers["location"]
+
+    status = client.get("/api/mail/google/status").json()
+    assert status["connected"] is True and status["email"] == "ivan@gmail.com"
+
+    # токены лежат только в зашифрованном виде
+    with db.get_conn() as conn:
+        raw = conn.execute("SELECT value FROM kv WHERE key = ?", (google_oauth.TOKENS_KEY,)).fetchone()[0]
+    assert "1//refresh" not in raw and "ya29.access" not in raw
+
+    # и почта считается подключённой через Google
+    settings = client.get("/api/settings").json()
+    assert settings["transport"]["kind"] == "google"
+    assert settings["resolved"]["ready"] is True
+
+
+def test_google_callback_rejects_wrong_state(monkeypatch):
+    _oauth_env(monkeypatch)
+    client.post("/api/mail/google/start")
+    resp = client.get("/api/mail/google/callback?code=x&state=broken", follow_redirects=False)
+    assert resp.status_code == 303 and "mail=google_failed" in resp.headers["location"]
+    assert client.get("/api/mail/google/status").json()["connected"] is False
+
+
+def test_google_send_uses_gmail_api(monkeypatch):
+    from app import google_oauth
+
+    sent = {}
+
+    def fake_post(url, payload, headers):
+        sent.update({"url": url, "json": payload, "headers": headers})
+        return _FakeResponse(200, {"id": "msg-42"})
+
+    monkeypatch.setattr("app.google_oauth._post_json", fake_post)
+    result = google_oauth.send("ya29.token", "dpo@spokeo.com", "Erasure request", "Text body",
+                              reply_to="ivan@gmail.com", sender="ivan@gmail.com")
+    assert result["ok"] is True and result["message_id"] == "msg-42"
+    assert sent["url"].endswith("/gmail/v1/users/me/messages/send")
+    assert sent["headers"]["Authorization"] == "Bearer ya29.token"
+    import base64
+    raw = base64.urlsafe_b64decode(sent["json"]["raw"]).decode()
+    assert "Subject: Erasure request" in raw and "To: dpo@spokeo.com" in raw
+    assert "text/plain" in raw  # только текст, без HTML и пикселей
+
+
+def test_mailer_prefers_google_over_smtp():
+    from app import mailer
+    cfg = {"host": "smtp.gmail.com", "port": 587, "from_addr": "a@b.co", "google_access": "ya29.token"}
+    assert mailer.transport(cfg) == "google"
+    assert mailer.transport_info(cfg)["label"].startswith("Вход через Google")
+
+
+def test_google_disconnect(monkeypatch):
+    _oauth_env(monkeypatch)
+    body = client.post("/api/mail/google/disconnect").json()
+    assert body["ok"] is True
+    assert client.get("/api/mail/google/status").json()["connected"] is False

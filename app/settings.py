@@ -123,8 +123,13 @@ def smtp_ready(cfg: dict[str, Any]) -> bool:
     return bool(cfg.get("host") and cfg.get("from_addr"))
 
 
-def public_view(settings: dict[str, Any], smtp_effective: dict[str, Any], dry_run: bool) -> dict[str, Any]:
-    """То, что можно отдавать в браузер: без пароля."""
+def public_view(settings: dict[str, Any], smtp_effective: dict[str, Any], dry_run: bool,
+                transport: dict[str, Any] | None = None) -> dict[str, Any]:
+    """То, что можно отдавать в браузер: без пароля.
+
+    transport — сводка из mailer.transport_info(): какой транспорт реально будет
+    использован (smtp / brevo / resend / none) и почему. Без секретов.
+    """
     smtp = dict(settings["smtp"])
     smtp["has_password"] = bool(smtp.pop("password", ""))
     return {
@@ -135,9 +140,11 @@ def public_view(settings: dict[str, Any], smtp_effective: dict[str, Any], dry_ru
             "port": smtp_effective.get("port", 587),
             "from_addr": smtp_effective.get("from_addr", ""),
             "user": smtp_effective.get("user", ""),
-            "ready": smtp_ready(smtp_effective),
+            "ready": bool((transport or {}).get("kind", "none") != "none"),
+            "smtp_ready": smtp_ready(smtp_effective),
             "use_ssl": bool(smtp_effective.get("use_ssl")),
         },
         "dry_run": dry_run,
         "presets": SMTP_PRESETS,
+        "transport": transport or {"kind": "none", "label": "не настроено", "notes": []},
     }

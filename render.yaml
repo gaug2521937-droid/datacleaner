@@ -32,3 +32,20 @@ services:
         sync: false
       - key: SMTP_FROM
         sync: false
+      # Бесплатный Render блокирует исходящий SMTP на портах 25/465/587.
+      # Поэтому основной путь — HTTPS-API провайдера (Brevo: 300 писем/день бесплатно).
+      # Задайте BREVO_API_KEY и EMAIL_FROM — транспорт включится сам, SMTP не нужен.
+      - key: BREVO_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: MAIL_PROVIDER
+        sync: false
+      # Вход через Google (OAuth): пользователь вводит обычный пароль Google,
+      # письма идут через Gmail API по HTTPS. Пароли приложений не нужны.
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: PUBLIC_BASE_URL
+        sync: false

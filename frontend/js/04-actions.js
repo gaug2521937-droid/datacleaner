@@ -318,6 +318,71 @@
     return { smtp: smtp };
   }
 
+  /* ------------------------- вход через Google (OAuth) ------------------------- */
+  async function actGoogleConnect() {
+    if (!state.server) {
+      toast('Вход через Google работает в серверной версии: в локальном режиме письма отправляются из вашей почты вручную.', 'warn', 8000);
+      return;
+    }
+    var g = (state.settings || {}).google || {};
+    if (!g.configured) {
+      openModal('Как включить вход через Google', '' +
+        '<p class="tiny">Один раз настраивается владельцем сервиса — 5 минут в Google Cloud, после этого вход для вас в один клик.</p>' +
+        '<ol class="tiny" style="padding-left:18px;line-height:1.9;margin:10px 0">' +
+        '<li><a href="https://console.cloud.google.com/projectcreate" target="_blank" rel="noopener noreferrer">Создать проект</a> в Google Cloud.</li>' +
+        '<li>APIs &amp; Services → Library → включить <b>Gmail API</b>.</li>' +
+        '<li>OAuth consent screen → External → добавить свой адрес в <b>Test users</b>, scope <span class="code">gmail.send</span>.</li>' +
+        '<li>Credentials → Create credentials → <b>OAuth client ID</b> → Web application → Authorized redirect URI:<br>' +
+        '<span class="code">' + esc(g.redirect_uri || (location.origin + '/api/mail/google/callback')) + '</span></li>' +
+        '<li>В Render → Environment добавить <span class="code">GOOGLE_CLIENT_ID</span> и ' +
+        '<span class="code">GOOGLE_CLIENT_SECRET</span> → Save.</li>' +
+        '</ol>' +
+        '<p class="tiny">После этого вернитесь сюда и нажмите «Войти через Google». Пароль вводится на странице Google, ' +
+        'приложение его не видит.</p>', [
+          { label: 'Понятно', cls: 'primary', onClick: closeModal }
+        ]);
+      return;
+    }
+    try {
+      var res = await http('POST', 'api/mail/google/start', {});
+      if (!res.ok || !res.auth_url) { toast(res.detail || 'Не удалось начать вход', 'bad', 8000); return; }
+      var win = window.open(res.auth_url, '_blank', 'noopener');
+      if (!win) { window.location.href = res.auth_url; return; }
+      toast('Введите пароль Google в открывшемся окне и разрешите отправку писем', 'warn', 9000);
+      /* ждём возврата: сервер запишет токен, интерфейс подхватит статус */
+      var tries = 0;
+      var timer = setInterval(async function () {
+        tries += 1;
+        try {
+          var st = await http('GET', 'api/mail/google/status');
+          if (st.connected) {
+            clearInterval(timer);
+            await reloadSettings();
+            renderGoogleCard(); renderMailStatus(); renderDryRunTip(); paintPilotStrip();
+            toast('Google подключён: письма будут уходить с ' + (st.email || 'вашего ящика'), 'ok', 9000);
+          }
+        } catch (e) { /* игнорируем, ждём дальше */ }
+        if (tries > 60) clearInterval(timer);
+      }, 3000);
+    } catch (e) { toast('Ошибка входа: ' + e.message, 'bad', 8000); }
+  }
+
+  async function actGoogleDisconnect() {
+    try {
+      var res = await http('POST', 'api/mail/google/disconnect', {});
+      await reloadSettings();
+      renderGoogleCard(); renderMailStatus(); renderDryRunTip(); paintPilotStrip();
+      toast(res.detail || 'Google отключён');
+    } catch (e) { toast('Ошибка: ' + e.message, 'bad', 7000); }
+  }
+
+  async function reloadSettings() {
+    try {
+      state.settings = await http('GET', 'api/settings');
+      state.serverMeta = await http('GET', 'api/health');
+    } catch (e) { /* настройки недоступны — не критично */ }
+  }
+
   async function actSaveSmtp(silent) {
     try {
       var payload = smtpPayload();
@@ -340,8 +405,9 @@
     toast('Проверяю SMTP…', 'warn', 2500);
     try {
       var res = await Api.testSmtp({ send_test: !!sendTest, probe_to: clean($('#smtp-from').value) || null });
-      if (res.ok) toast(res.detail || 'Соединение установлено', 'ok', 8000);
-      else toast(res.detail || 'Не удалось подключиться', 'bad', 9000);
+      var via = res.transport === 'smtp' ? 'SMTP' : (res.transport ? 'HTTPS-API (' + res.transport + ')' : '');
+      if (res.ok) toast((via ? via + ': ' : '') + (res.detail || 'Соединение установлено'), 'ok', 8000);
+      else toast(res.detail || 'Не удалось подключиться', 'bad', 12000);
       if (res.dry_run && sendTest) toast('DRY_RUN=1: тестовое письмо не отправлено', 'warn', 7000);
     } catch (e) { toast('Проверка не удалась: ' + e.message, 'bad', 8000); }
   }
@@ -959,6 +1025,9 @@
     });
     $('#pilot-run').addEventListener('click', actRunPilot);
     $('#pilot-open').addEventListener('click', function () { navigate('autopilot'); });
+
+    $('#google-connect').addEventListener('click', actGoogleConnect);
+    $('#google-disconnect').addEventListener('click', actGoogleDisconnect);
 
     $('#smtp-save').addEventListener('click', function () { actSaveSmtp(false); });
     $('#smtp-test').addEventListener('click', function () { actTestSmtp(false); });

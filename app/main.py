@@ -22,7 +22,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import assistant, autopilot, db, knowledge, letters, mailer
+from . import assistant, autopilot, db, google_oauth, knowledge, letters, mailer
 from . import settings as settings_mod
 from . import stats as stats_mod
 from .crypto import Vault, VaultError
@@ -97,7 +97,8 @@ ACCESS_TOKEN = (os.getenv("ACCESS_TOKEN") or "").strip()
 
 @app.middleware("http")
 async def access_guard(request: Request, call_next):
-    if ACCESS_TOKEN and request.url.path.startswith("/api") and request.url.path != "/api/health":
+    public_paths = ("/api/health", "/api/mail/google/callback")
+    if ACCESS_TOKEN and request.url.path.startswith("/api") and request.url.path not in public_paths:
         token = request.headers.get("X-Access-Token") or request.query_params.get("access_token") or ""
         if token != ACCESS_TOKEN:
             return JSONResponse(
@@ -207,17 +208,28 @@ ALLOWED_TRANSITIONS: dict[str, set[str]] = {
 def health(conn=Depends(get_db)) -> dict[str, Any]:
     blob, _ = db.load_profile_blob(conn)
     smtp_ready = mailer.is_smtp_configured()
+    smtp_cfg: dict[str, Any] = mailer.smtp_config()
     autopilot_cfg = dict(settings_mod.DEFAULT_AUTOPILOT)
     try:
         vault = Vault()
         autopilot_cfg = settings_mod.load(conn, vault)["autopilot"]
-        smtp_ready = settings_mod.smtp_ready(settings_mod.effective_smtp(conn, vault))
+        smtp_cfg = settings_mod.effective_smtp(conn, vault)
+        smtp_ready = settings_mod.smtp_ready(smtp_cfg)
     except VaultError:
         pass
+    google_token = ""
+    try:
+        google_token = google_oauth.access_token(conn, Vault())
+    except Exception:  # noqa: BLE001 — нет ключа DATA_KEY и т.п.
+        google_token = ""
+    smtp_cfg = {**smtp_cfg, "google_access": google_token}
+    mail_info = mailer.transport_info(smtp_cfg)
     return {
         "ok": True,
         "dry_run": mailer.dry_run_enabled(),
         "smtp_configured": smtp_ready,
+        "mail_ready": mail_info["kind"] != "none",
+        "mail_transport": mail_info["kind"],
         "llm_configured": assistant.is_configured(),
         "profile_saved": blob is not None,
         "data_key_from_env": bool(os.getenv("DATA_KEY")),
@@ -579,29 +591,51 @@ def export_data(conn=Depends(get_db), vault: Vault = Depends(get_vault)) -> JSON
 
 
 # --- настройки: SMTP и автопилот ------------------------------------------
-@app.get("/api/settings")
-def get_settings(conn=Depends(get_db), vault: Vault = Depends(get_vault)) -> dict[str, Any]:
+def _mail_view(conn, vault: Vault, request: Request | None = None) -> dict[str, Any]:
+    """Настройки + фактический транспорт почты (SMTP / Google / HTTPS-API)."""
     data = settings_mod.load(conn, vault)
     effective = settings_mod.effective_smtp(conn, vault)
-    return {"ok": True, **settings_mod.public_view(data, effective, mailer.dry_run_enabled())}
+    token = google_oauth.access_token(conn, vault)
+    effective_full = {**effective, "google_access": token}
+    base = str(request.base_url) if request is not None else "https://example.com/"
+    return {
+        **settings_mod.public_view(data, effective_full if token else effective,
+                                   mailer.dry_run_enabled(), mailer.transport_info(effective_full)),
+        "google": google_oauth.status(conn, vault, base),
+    }
+
+
+@app.get("/api/settings")
+def get_settings(request: Request, conn=Depends(get_db), vault: Vault = Depends(get_vault)) -> dict[str, Any]:
+    return {"ok": True, **_mail_view(conn, vault, request)}
 
 
 @app.put("/api/settings")
-def put_settings(payload: dict[str, Any], conn=Depends(get_db),
+def put_settings(payload: dict[str, Any], request: Request, conn=Depends(get_db),
                  vault: Vault = Depends(get_vault)) -> dict[str, Any]:
-    data = settings_mod.save(conn, vault, payload)
-    effective = settings_mod.effective_smtp(conn, vault)
+    settings_mod.save(conn, vault, payload)
     return {"ok": True, "detail": "Настройки сохранены (пароль SMTP зашифрован).",
-            **settings_mod.public_view(data, effective, mailer.dry_run_enabled())}
+            **_mail_view(conn, vault, request)}
 
 
 @app.post("/api/settings/smtp/test")
 def smtp_test(payload: dict[str, Any] | None = None, conn=Depends(get_db),
               vault: Vault = Depends(get_vault)) -> dict[str, Any]:
     cfg = settings_mod.effective_smtp(conn, vault)
-    probe = (payload or {}).get("probe_to") or cfg.get("from_addr")
-    result = mailer.verify_smtp(cfg, probe_to=probe if (payload or {}).get("send_test") else None)
+    google_token = google_oauth.access_token(conn, vault)
+    cfg["google_access"] = google_token
+    probe = ((payload or {}).get("probe_to") or google_oauth.connected_email(conn, vault)
+             or mailer.email_from(cfg) or cfg.get("from_addr"))
+    wants_test = (payload or {}).get("send_test")
+    # Проверяется тот транспорт, который реально будет использован:
+    # Google OAuth, HTTPS-API провайдера или SMTP.
+    if mailer.transport(cfg) == "google":
+        result = google_oauth.verify(conn, vault, probe_to=probe if wants_test else None)
+    else:
+        result = mailer.verify_mail(cfg, probe_to=probe if wants_test else None)
+    info = mailer.transport_info(cfg)
     return {"ok": result["ok"], "detail": result["detail"], "dry_run": mailer.dry_run_enabled(),
+            "transport": result.get("transport") or info["kind"],
             "host": cfg.get("host"), "port": cfg.get("port")}
 
 
@@ -609,6 +643,41 @@ def smtp_test(payload: dict[str, Any] | None = None, conn=Depends(get_db),
 def autopilot_run(conn=Depends(get_db), vault: Vault = Depends(get_vault)) -> dict[str, Any]:
     """Принудительный проход автопилота (не ждать интервал)."""
     return {"ok": True, "report": autopilot.cycle(conn, vault, force=True)}
+
+
+# --- вход через Google (OAuth 2.0): отправка с вашего Gmail без паролей приложений ---
+@app.get("/api/mail/google/status")
+def google_status(request: Request, conn=Depends(get_db), vault: Vault = Depends(get_vault)) -> dict[str, Any]:
+    return {"ok": True, **google_oauth.status(conn, vault, str(request.base_url))}
+
+
+@app.post("/api/mail/google/start")
+def google_start(request: Request, conn=Depends(get_db), vault: Vault = Depends(get_vault)) -> dict[str, Any]:
+    """Возвращает ссылку на страницу входа Google (пароль вводится у Google, не у нас)."""
+    return google_oauth.start(conn, str(request.base_url))
+
+
+@app.get("/api/mail/google/callback")
+def google_callback(code: str = "", state: str = "", error: str = "", request: Request = None,
+                    conn=Depends(get_db), vault: Vault = Depends(get_vault)):
+    """Google возвращает сюда код: меняем на токены и уводим в интерфейс."""
+    from fastapi.responses import RedirectResponse
+
+    base = str(request.base_url) if request is not None else "https://example.com/"
+    if error:
+        return RedirectResponse(url="/?mail=google_denied", status_code=303)
+    if not code:
+        return RedirectResponse(url="/?mail=google_nocode", status_code=303)
+    result = google_oauth.exchange_code(conn, vault, code, state, base)
+    if not result.get("ok"):
+        return RedirectResponse(url="/?mail=google_failed", status_code=303)
+    return RedirectResponse(url="/?mail=google_ok#autopilot", status_code=303)
+
+
+@app.post("/api/mail/google/disconnect")
+def google_disconnect(conn=Depends(get_db)) -> dict[str, Any]:
+    google_oauth.clear_tokens(conn)
+    return {"ok": True, "detail": "Google отключён: токен удалён с сервера."}
 
 
 # --- AI -------------------------------------------------------------------

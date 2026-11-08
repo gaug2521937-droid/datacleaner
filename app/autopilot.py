@@ -18,7 +18,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from . import db, letters, mailer, settings as settings_mod
+from . import db, google_oauth, letters, mailer, settings as settings_mod
 from .crypto import Vault
 
 log = logging.getLogger("datacleaner.autopilot")
@@ -51,7 +51,13 @@ def _profile(conn, vault: Vault) -> dict[str, Any]:
 
 
 def _smtp(conn, vault: Vault) -> dict[str, Any]:
-    return settings_mod.effective_smtp(conn, vault)
+    """Настройки почты + активный транспорт: OAuth-токен Google, если подключён."""
+    cfg = settings_mod.effective_smtp(conn, vault)
+    token = google_oauth.access_token(conn, vault)
+    if token:
+        cfg["google_access"] = token
+        cfg["google_sender"] = google_oauth.connected_email(conn, vault) or ""
+    return cfg
 
 
 def send_one(conn, vault: Vault, request_id: int, dry_run: bool | None = None) -> dict[str, Any]:
@@ -145,8 +151,9 @@ def cycle(conn=None, vault: Vault | None = None, force: bool = False) -> dict[st
         cfg = settings_mod.load(c, vault)["autopilot"]
         dry = mailer.dry_run_enabled()
         smtp = _smtp(c, vault)
-        if not settings_mod.smtp_ready(smtp) and not dry:
-            report["skipped"] = "SMTP не настроен и DRY_RUN выключен — отправлять нечем"
+        if not mailer.mail_ready(smtp) and not dry:
+            report["skipped"] = ("Почта не настроена и DRY_RUN выключен — отправлять нечем: "
+                                 "заполните SMTP в «Автопилоте» или задайте BREVO_API_KEY / RESEND_API_KEY")
         if cfg.get("auto_send") or force:
             for row in db.list_requests(c, "draft"):
                 if row["method"] != "email" or not row["to_email"]:

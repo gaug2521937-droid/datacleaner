@@ -149,7 +149,7 @@ h2.sec{margin:0;font-size:clamp(19px,2.4vw,23px);letter-spacing:-.5px;font-weigh
 .card.pad-lg{padding:24px}
 .card h3{margin:0 0 3px;font-size:14px;font-weight:750;letter-spacing:.1px}
 .card .sub{margin:0 0 16px;color:var(--muted);font-size:12.5px}
-.grid-2{display:grid;grid-template-columns:1.04fr .96fr;gap:16px}
+.grid-2{display:grid;grid-template-columns:1.04fr .96fr;gap:16px;align-items:start}
 .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
 .stack{display:grid;gap:16px}
 
@@ -792,9 +792,31 @@ body.modal-open .toasts{top:86px;bottom:auto}
       <span class="status-chip" id="pilot-state-chip"><span class="dot"></span><span class="txt">выключен</span></span>
     </div>
 
-    <div class="grid-2">
+    <div class="grid-2" style="align-items:start">
+     <div class="stack">
+      <div class="card pad-lg" id="google-card">
+        <div class="inline" style="justify-content:space-between;margin-bottom:4px">
+          <h3 style="margin:0">Вход через Google</h3>
+          <span class="pill acc" id="google-state">проверка…</span>
+        </div>
+        <p class="sub">Обычный пароль Google — без «паролей приложений». Письма уходят с вашего Gmail через
+          Gmail API по HTTPS, поэтому это работает и на бесплатном хостинге, где SMTP закрыт.</p>
+        <div class="stack" style="gap:10px">
+          <div class="dl"><span class="nm" id="google-account">Аккаунт не подключён</span>
+            <span class="dt" id="google-hint">вход в один клик</span></div>
+          <div class="inline">
+            <button class="btn primary" id="google-connect">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/></svg>
+              Войти через Google
+            </button>
+            <button class="btn ghost" id="google-disconnect" style="display:none">Отключить</button>
+          </div>
+          <p class="tiny" style="margin:0" id="google-note"></p>
+        </div>
+      </div>
+
       <div class="card pad-lg">
-        <h3>Почта для отправки</h3>
+        <h3>Почта для отправки (SMTP)</h3>
         <p class="sub">Пароль хранится в зашифрованном виде (Fernet) и никогда не отдаётся в браузер.</p>
         <div class="row">
           <div class="field">
@@ -827,6 +849,7 @@ body.modal-open .toasts{top:86px;bottom:auto}
         </div>
         <p class="tiny" style="margin:12px 0 0" id="smtp-status"></p>
       </div>
+     </div>
 
       <div class="stack">
         <div class="card">
@@ -861,7 +884,7 @@ body.modal-open .toasts{top:86px;bottom:auto}
             <div class="tip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
               <div>Все действия пишутся в историю запроса: когда отправлено, когда напомнили, что ответил оператор.</div></div>
             <div class="tip warn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.6L2.5 17a2 2 0 0 0 1.7 3h15.6a2 2 0 0 0 1.7-3L13.7 3.6a2 2 0 0 0-3.4 0z"/></svg>
-              <div>Пока <span class="code">DRY_RUN=1</span>, письма не уходят: автопилот только отмечает, что отправил бы. Выключите DRY_RUN на сервере для реальной отправки.</div></div>
+              <div id="dry-run-tip">Пока <span class="code">DRY_RUN=1</span>, письма не уходят: автопилот только отмечает, что отправил бы. Выключите DRY_RUN на сервере для реальной отправки.</div></div>
           </div>
         </div>
       </div>
