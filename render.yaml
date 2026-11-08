@@ -1,0 +1,34 @@
+# Render Blueprint (необязательно: сервис можно создать и через API/панель).
+# Секреты не хранятся в файле: sync: false означает «спросить значение при деплое».
+services:
+  - type: web
+    name: datacleaner
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: frankfurt
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: DATA_KEY
+        sync: false
+      - key: ACCESS_TOKEN
+        sync: false
+      - key: DRY_RUN
+        value: "1"
+      - key: LLM_BASE_URL
+        value: https://tokenlavka.com/v1
+      - key: LLM_MODEL
+        value: gpt-6-luna
+      - key: LLM_API_KEY
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM
+        sync: false

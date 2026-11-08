@@ -1,0 +1,2970 @@
+<!DOCTYPE html>
+<!--
+  Файл собран автоматически: python tools/build_html.py
+  Правьте исходники в frontend/ (index.template.html + frontend/js/*.js),
+  а не этот файл — иначе изменения потеряются при следующей сборке.
+  Внешних CSS/JS/шрифтов нет: файл работает офлайн и с телефона.
+-->
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0f1a">
+<meta name="description" content="DataCleaner — находите и удаляйте свои персональные данные из интернета: брокеры данных, people-search, маркетинговые базы. 152-ФЗ, GDPR, CCPA.">
+<title>DataCleaner — удаление персональных данных из интернета</title>
+<style>
+/* ============================================================
+   DataCleaner — один файл, без внешних CSS/JS/шрифтов/картинок.
+   Тёмная тема, градиенты, мягкие тени, адаптив от 320px.
+   ============================================================ */
+:root{
+  --bg:#080b14;
+  --bg-2:#0b1020;
+  --panel:rgba(255,255,255,.045);
+  --panel-2:rgba(255,255,255,.07);
+  --stroke:rgba(255,255,255,.09);
+  --stroke-2:rgba(255,255,255,.16);
+  --text:#e8ecf6;
+  --muted:#8d97b0;
+  --muted-2:#6b7590;
+  --acc:#7c5cff;
+  --acc-2:#22d3ee;
+  --acc-3:#f472b6;
+  --ok:#34d399;
+  --warn:#fbbf24;
+  --bad:#fb7185;
+  --r-lg:22px;
+  --r-md:16px;
+  --r-sm:11px;
+  --shadow:0 18px 50px -22px rgba(0,0,0,.9), 0 2px 10px rgba(0,0,0,.35);
+  --shadow-soft:0 10px 30px -18px rgba(0,0,0,.85);
+  --grad:linear-gradient(135deg,#7c5cff 0%,#5b8cff 45%,#22d3ee 100%);
+  --grad-2:linear-gradient(135deg,#f472b6,#7c5cff 60%,#22d3ee);
+  --ff:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans",sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  font-family:var(--ff);
+  color:var(--text);
+  background:var(--bg);
+  min-height:100vh;
+  line-height:1.55;
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+  overflow-x:hidden;
+}
+body::before{
+  content:"";position:fixed;inset:0;z-index:-2;pointer-events:none;
+  background:
+    radial-gradient(900px 520px at 8% -8%, rgba(124,92,255,.30), transparent 65%),
+    radial-gradient(820px 520px at 96% 2%, rgba(34,211,238,.20), transparent 62%),
+    radial-gradient(760px 460px at 62% 108%, rgba(244,114,182,.16), transparent 65%),
+    linear-gradient(180deg,#080b14 0%,#0a0e1a 40%,#070a12 100%);
+}
+body::after{
+  content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.35;
+  background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);
+  background-size:64px 64px;
+  mask-image:radial-gradient(circle at 50% 0%,#000 0%,transparent 78%);
+  -webkit-mask-image:radial-gradient(circle at 50% 0%,#000 0%,transparent 78%);
+}
+a{color:#9db4ff;text-decoration:none}
+a:hover{text-decoration:underline}
+button,input,select,textarea{font:inherit;color:inherit}
+::selection{background:rgba(124,92,255,.45)}
+
+/* ---------- scrollbars ---------- */
+*{scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.18) transparent}
+*::-webkit-scrollbar{width:9px;height:9px}
+*::-webkit-scrollbar-thumb{background:rgba(255,255,255,.16);border-radius:99px}
+*::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.26)}
+
+/* ---------- top bar ---------- */
+.topbar{
+  position:sticky;top:0;z-index:50;
+  display:flex;align-items:center;gap:14px;
+  padding:10px max(14px,env(safe-area-inset-left)) 10px max(14px,env(safe-area-inset-right));
+  background:rgba(8,11,20,.72);
+  backdrop-filter:blur(18px) saturate(140%);
+  -webkit-backdrop-filter:blur(18px) saturate(140%);
+  border-bottom:1px solid var(--stroke);
+}
+.brand{display:flex;align-items:center;gap:10px;flex:0 0 auto;cursor:pointer;user-select:none}
+.brand-logo{
+  width:36px;height:36px;border-radius:12px;display:grid;place-items:center;
+  background:var(--grad);box-shadow:0 8px 22px -8px rgba(124,92,255,.9);
+  flex:0 0 auto;
+}
+.brand-logo svg{width:20px;height:20px;display:block}
+.brand-name{font-weight:700;letter-spacing:.2px;font-size:16px;white-space:nowrap}
+.brand-name span{background:var(--grad-2);-webkit-background-clip:text;background-clip:text;color:transparent}
+.badge-mode{
+  font-size:10.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;
+  padding:3px 8px;border-radius:99px;border:1px solid var(--stroke-2);color:var(--muted);
+  white-space:nowrap;
+}
+.badge-mode.server{color:#a9f5e4;border-color:rgba(52,211,153,.4);background:rgba(52,211,153,.1)}
+.nav{
+  display:flex;gap:4px;align-items:center;overflow-x:auto;flex:1 1 auto;
+  scrollbar-width:none;-webkit-overflow-scrolling:touch;
+}
+.nav::-webkit-scrollbar{display:none}
+.nav button{
+  border:0;background:transparent;color:var(--muted);font-weight:600;font-size:13.5px;
+  padding:9px 13px;border-radius:11px;cursor:pointer;white-space:nowrap;
+  transition:color .18s,background .18s,transform .18s;
+}
+.nav button:hover{color:var(--text);background:var(--panel)}
+.nav button.active{color:#fff;background:linear-gradient(135deg,rgba(124,92,255,.35),rgba(34,211,238,.22));box-shadow:inset 0 0 0 1px rgba(255,255,255,.12)}
+.topbar .spacer{flex:0 0 auto}
+
+/* ---------- layout ---------- */
+main{max-width:1220px;margin:0 auto;padding:22px max(14px,env(safe-area-inset-left)) 90px max(14px,env(safe-area-inset-right))}
+.view{display:none;animation:fade .35s ease both}
+.view.active{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes pop{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:none}}
+
+.card{
+  background:linear-gradient(160deg,rgba(255,255,255,.062),rgba(255,255,255,.028));
+  border:1px solid var(--stroke);border-radius:var(--r-lg);
+  box-shadow:var(--shadow);padding:20px;position:relative;overflow:hidden;
+  transition:transform .25s cubic-bezier(.2,.8,.2,1),border-color .25s,box-shadow .25s;
+}
+.card::after{
+  content:"";position:absolute;inset:0;pointer-events:none;border-radius:inherit;
+  background:linear-gradient(120deg,rgba(255,255,255,.10),transparent 30%);opacity:.5;
+}
+.card.hover:hover{transform:translateY(-3px);border-color:var(--stroke-2)}
+.card h3{margin:0 0 4px;font-size:14px;letter-spacing:.2px;font-weight:700}
+.card .sub{color:var(--muted);font-size:12.5px;margin:0 0 16px}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:16px}
+.stack{display:grid;gap:16px}
+
+/* ---------- hero ---------- */
+.hero{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;justify-content:space-between;margin:6px 0 20px}
+.hero h1{margin:0;font-size:clamp(24px,4vw,38px);line-height:1.12;letter-spacing:-.6px}
+.hero h1 em{font-style:normal;background:var(--grad-2);-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero p{margin:8px 0 0;color:var(--muted);max-width:62ch;font-size:14px}
+.hero-actions{display:flex;gap:9px;flex-wrap:wrap}
+
+/* ---------- buttons ---------- */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  border-radius:12px;border:1px solid var(--stroke-2);background:var(--panel);
+  color:var(--text);font-weight:650;font-size:13.5px;padding:10px 15px;cursor:pointer;
+  transition:transform .16s,background .18s,border-color .18s,opacity .18s,box-shadow .18s;
+  text-decoration:none;white-space:nowrap;
+}
+.btn:hover{transform:translateY(-1px);background:var(--panel-2);border-color:rgba(255,255,255,.26)}
+.btn:active{transform:translateY(0) scale(.99)}
+.btn:disabled{opacity:.45;cursor:not-allowed;transform:none}
+.btn svg{width:15px;height:15px}
+.btn.primary{
+  background:var(--grad);border-color:transparent;color:#0a0a14;font-weight:750;
+  box-shadow:0 12px 28px -14px rgba(124,92,255,.95);
+}
+.btn.primary:hover{box-shadow:0 16px 34px -14px rgba(124,92,255,1)}
+.btn.ghost{background:transparent}
+.btn.danger{border-color:rgba(251,113,133,.42);color:#ffc2cc;background:rgba(251,113,133,.10)}
+.btn.danger:hover{background:rgba(251,113,133,.18)}
+.btn.ok{border-color:rgba(52,211,153,.4);color:#b6f7dd;background:rgba(52,211,153,.1)}
+.btn.sm{padding:6px 10px;font-size:12px;border-radius:9px;gap:6px}
+.btn.sm svg{width:13px;height:13px}
+.btn.wide{width:100%}
+
+/* ---------- KPI ---------- */
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.kpi{
+  padding:16px 16px 14px;border-radius:18px;border:1px solid var(--stroke);
+  background:linear-gradient(165deg,rgba(255,255,255,.075),rgba(255,255,255,.025));
+  box-shadow:var(--shadow-soft);position:relative;overflow:hidden;
+  transition:transform .25s,border-color .25s;
+}
+.kpi:hover{transform:translateY(-2px);border-color:var(--stroke-2)}
+.kpi .kpi-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
+.kpi .kpi-label{font-size:11.5px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);font-weight:700}
+.kpi .kpi-dot{width:30px;height:30px;border-radius:10px;display:grid;place-items:center;background:rgba(255,255,255,.07);border:1px solid var(--stroke)}
+.kpi .kpi-dot svg{width:15px;height:15px}
+.kpi .kpi-value{font-size:clamp(26px,3.4vw,34px);font-weight:800;letter-spacing:-1px;line-height:1;font-variant-numeric:tabular-nums}
+.kpi .kpi-hint{color:var(--muted-2);font-size:11.5px;margin-top:8px}
+.kpi.ok .kpi-value{color:#6ee7b7}
+.kpi.warn .kpi-value{color:#fcd34d}
+.kpi.bad .kpi-value{color:#fda4af}
+.kpi.acc .kpi-value{background:var(--grad-2);-webkit-background-clip:text;background-clip:text;color:transparent}
+.kpi .glow{position:absolute;right:-30px;bottom:-40px;width:120px;height:120px;border-radius:50%;filter:blur(28px);opacity:.35}
+
+/* ---------- ring ---------- */
+.ring-wrap{display:flex;align-items:center;gap:22px;flex-wrap:wrap}
+.ring{
+  --p:0;--c1:#7c5cff;--c2:#22d3ee;
+  width:150px;height:150px;border-radius:50%;flex:0 0 auto;position:relative;
+  background:conic-gradient(from -90deg,var(--c1) 0%,var(--c2) calc(var(--p) * 1%),rgba(255,255,255,.075) calc(var(--p) * 1%),rgba(255,255,255,.075) 100%);
+  transition:background .8s ease;
+  box-shadow:0 0 42px -12px rgba(124,92,255,.65), inset 0 0 30px rgba(0,0,0,.4);
+}
+.ring::before{
+  content:"";position:absolute;inset:13px;border-radius:50%;
+  background:radial-gradient(circle at 30% 20%,#141a2c,#0a0e19 70%);
+  border:1px solid rgba(255,255,255,.07);
+}
+.ring .ring-center{
+  position:absolute;inset:0;display:grid;place-content:center;text-align:center;gap:2px;
+}
+.ring .ring-num{font-size:30px;font-weight:800;letter-spacing:-1.2px;font-variant-numeric:tabular-nums;line-height:1}
+.ring .ring-cap{font-size:10.5px;letter-spacing:.9px;text-transform:uppercase;color:var(--muted);font-weight:700}
+.ring-legend{display:grid;gap:10px;flex:1 1 180px;min-width:170px}
+.legend-row{display:flex;align-items:center;gap:9px;font-size:13px;color:var(--muted)}
+.legend-row b{color:var(--text);margin-left:auto;font-variant-numeric:tabular-nums}
+.legend-dot{width:9px;height:9px;border-radius:3px;flex:0 0 auto}
+
+/* ---------- bars / funnel ---------- */
+.funnel{display:grid;gap:12px}
+.bar-row{display:grid;gap:6px}
+.bar-head{display:flex;justify-content:space-between;font-size:12.5px;color:var(--muted)}
+.bar-head b{color:var(--text);font-variant-numeric:tabular-nums}
+.bar-track{height:10px;border-radius:99px;background:rgba(255,255,255,.07);overflow:hidden;position:relative}
+.bar-fill{
+  height:100%;border-radius:99px;background:var(--grad);width:0;
+  transition:width .9s cubic-bezier(.2,.8,.2,1);
+  box-shadow:0 0 18px -4px rgba(124,92,255,.8);
+}
+.bar-fill.c2{background:linear-gradient(90deg,#22d3ee,#5b8cff)}
+.bar-fill.c3{background:linear-gradient(90deg,#34d399,#22d3ee)}
+.bar-fill.c4{background:linear-gradient(90deg,#fbbf24,#f472b6)}
+.bar-fill.c5{background:linear-gradient(90deg,#fb7185,#a855f7)}
+
+/* ---------- activity chart ---------- */
+.chart{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:5px;height:168px;padding:6px 2px 0}
+.chart .col{display:grid;grid-template-rows:1fr auto;justify-items:center;align-items:end;height:100%}
+.chart .bar{
+  width:100%;max-width:32px;border-radius:9px 9px 4px 4px;min-height:4px;align-self:end;
+  background:linear-gradient(180deg,#22d3ee,#7c5cff);
+  box-shadow:0 -6px 18px -8px rgba(34,211,238,.9);
+  transition:height .8s cubic-bezier(.2,.8,.2,1),filter .2s;
+  position:relative;
+}
+.chart .bar.zero{background:rgba(255,255,255,.09);box-shadow:none}
+.chart .col:hover .bar{filter:brightness(1.25)}
+.chart .cl{font-size:9px;color:var(--muted-2);white-space:nowrap;letter-spacing:.2px;padding-top:6px;opacity:.85}
+.chart .bar span{
+  position:absolute;top:-17px;left:50%;transform:translateX(-50%);
+  font-size:10px;font-weight:700;color:var(--text);opacity:0;transition:opacity .2s;
+}
+.chart .col:hover .bar span{opacity:1}
+.chart .col:hover .bar span{opacity:1}
+
+/* ---------- deadlines ---------- */
+.dl-list{display:grid;gap:9px;max-height:340px;overflow:auto;padding-right:2px}
+.dl{
+  display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:13px;
+  background:rgba(255,255,255,.04);border:1px solid var(--stroke);font-size:13px;
+  transition:background .18s,border-color .18s;
+}
+.dl:hover{background:rgba(255,255,255,.07);border-color:var(--stroke-2)}
+.dl .nm{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dl .dt{font-size:11.5px;color:var(--muted-2);white-space:nowrap}
+.pill{
+  font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px;white-space:nowrap;
+  border:1px solid transparent;letter-spacing:.2px;
+}
+.pill.ok{color:#a7f3d0;background:rgba(52,211,153,.14);border-color:rgba(52,211,153,.3)}
+.pill.warn{color:#fde68a;background:rgba(251,191,36,.14);border-color:rgba(251,191,36,.32)}
+.pill.bad{color:#fecdd3;background:rgba(251,113,133,.15);border-color:rgba(251,113,133,.34)}
+.pill.neutral{color:#c3cbe0;background:rgba(255,255,255,.07);border-color:var(--stroke-2)}
+.pill.acc{color:#d6ccff;background:rgba(124,92,255,.2);border-color:rgba(124,92,255,.4)}
+
+/* ---------- tips ---------- */
+.tips{display:grid;gap:10px}
+.tip{
+  display:flex;gap:11px;padding:12px 13px;border-radius:14px;font-size:13px;
+  background:linear-gradient(120deg,rgba(124,92,255,.13),rgba(34,211,238,.07));
+  border:1px solid rgba(124,92,255,.22);color:#dfe5f5;
+}
+.tip svg{width:16px;height:16px;flex:0 0 auto;margin-top:2px;opacity:.9}
+.tip.warn{background:linear-gradient(120deg,rgba(251,191,36,.13),rgba(251,113,133,.07));border-color:rgba(251,191,36,.25)}
+
+/* ---------- forms ---------- */
+.field{display:grid;gap:6px;margin-bottom:14px}
+.field label{font-size:12.5px;font-weight:650;color:var(--muted);letter-spacing:.2px}
+.field .help{font-size:11.5px;color:var(--muted-2)}
+input[type=text],input[type=email],input[type=tel],input[type=password],input[type=url],input[type=number],select,textarea{
+  width:100%;padding:11px 13px;border-radius:12px;
+  background:rgba(6,9,17,.72);border:1px solid var(--stroke-2);color:var(--text);
+  transition:border-color .18s,box-shadow .18s,background .18s;font-size:14px;
+}
+input::placeholder,textarea::placeholder{color:#5b6480}
+input:focus,select:focus,textarea:focus{
+  outline:none;border-color:rgba(124,92,255,.75);
+  box-shadow:0 0 0 3.5px rgba(124,92,255,.18),0 0 28px -12px rgba(124,92,255,.9);
+  background:rgba(8,12,22,.9);
+}
+textarea{resize:vertical;min-height:96px;line-height:1.6}
+select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,#8d97b0 50%),linear-gradient(135deg,#8d97b0 50%,transparent 50%);background-position:calc(100% - 18px) 50%,calc(100% - 13px) 50%;background-size:5px 5px,5px 5px;background-repeat:no-repeat;padding-right:34px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.row-3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.inline{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
+.chips{display:flex;gap:7px;flex-wrap:wrap}
+.chip{
+  font-size:12px;font-weight:650;padding:7px 12px;border-radius:99px;cursor:pointer;
+  border:1px solid var(--stroke-2);background:var(--panel);color:var(--muted);
+  transition:all .18s;user-select:none;
+}
+.chip:hover{color:var(--text);background:var(--panel-2)}
+.chip.active{color:#0a0a14;background:var(--grad);border-color:transparent;font-weight:750}
+
+/* ---------- broker cards ---------- */
+.brokers{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px;margin-top:16px}
+.broker{
+  display:flex;flex-direction:column;gap:11px;padding:16px;border-radius:18px;
+  background:linear-gradient(165deg,rgba(255,255,255,.06),rgba(255,255,255,.022));
+  border:1px solid var(--stroke);box-shadow:var(--shadow-soft);
+  transition:transform .22s,border-color .22s;
+}
+.broker:hover{transform:translateY(-2px);border-color:var(--stroke-2)}
+.broker .b-top{display:flex;gap:9px;align-items:flex-start}
+.broker .b-name{font-weight:750;font-size:14.5px;line-height:1.3;flex:1 1 auto}
+.broker .b-cat{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;font-weight:700}
+.broker .b-notes{font-size:12.5px;color:var(--muted);flex:1 1 auto}
+.broker .b-meta{display:flex;gap:6px;flex-wrap:wrap}
+.broker .b-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:2px}
+.verify{
+  display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;
+  color:#fde68a;background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.3);
+  padding:3px 8px;border-radius:99px;text-transform:uppercase;letter-spacing:.4px;
+}
+.verify svg{width:11px;height:11px}
+
+/* ---------- requests list ---------- */
+.req{
+  display:grid;gap:11px;padding:16px;border-radius:18px;
+  background:linear-gradient(165deg,rgba(255,255,255,.055),rgba(255,255,255,.022));
+  border:1px solid var(--stroke);box-shadow:var(--shadow-soft);
+  transition:border-color .2s,transform .2s;
+}
+.req:hover{border-color:var(--stroke-2);transform:translateY(-1px)}
+.req-head{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.req-name{font-weight:750;font-size:15px;flex:1 1 auto;min-width:120px}
+.req-meta{display:flex;gap:8px;flex-wrap:wrap;font-size:11.5px;color:var(--muted-2)}
+.req-meta span{display:inline-flex;align-items:center;gap:5px}
+.req-meta svg{width:12px;height:12px;opacity:.8}
+.req-actions{display:flex;gap:7px;flex-wrap:wrap}
+.timeline{display:grid;gap:0;margin-top:4px;border-left:1px dashed rgba(255,255,255,.16);padding-left:14px}
+.tl-item{position:relative;padding:5px 0;font-size:12.5px;color:var(--muted)}
+.tl-item::before{content:"";position:absolute;left:-19px;top:11px;width:8px;height:8px;border-radius:50%;background:var(--acc);box-shadow:0 0 10px rgba(124,92,255,.9)}
+.tl-item.bad::before{background:var(--bad);box-shadow:0 0 10px rgba(251,113,133,.9)}
+.tl-item.ok::before{background:var(--ok);box-shadow:0 0 10px rgba(52,211,153,.9)}
+.tl-item .t-when{color:var(--muted-2);font-size:11px;margin-left:6px}
+.empty{
+  text-align:center;padding:44px 20px;color:var(--muted);border:1px dashed var(--stroke-2);
+  border-radius:18px;background:rgba(255,255,255,.02);font-size:13.5px;
+}
+.empty strong{display:block;color:var(--text);font-size:15px;margin-bottom:6px}
+
+/* ---------- AI chat ---------- */
+.chat{display:grid;gap:12px;max-height:min(56vh,520px);overflow:auto;padding:4px 2px 4px 0;margin-bottom:14px}
+.msg{display:flex;gap:10px;animation:pop .28s ease both}
+.msg .av{
+  width:30px;height:30px;border-radius:10px;flex:0 0 auto;display:grid;place-items:center;
+  font-size:12px;font-weight:800;background:rgba(255,255,255,.08);border:1px solid var(--stroke);
+}
+.msg.user .av{background:linear-gradient(135deg,#5b8cff,#22d3ee);color:#08111d;border-color:transparent}
+.msg.bot .av{background:linear-gradient(135deg,#7c5cff,#f472b6);color:#0d0716;border-color:transparent}
+.msg .bubble{
+  padding:11px 14px;border-radius:15px;font-size:13.5px;line-height:1.62;
+  background:rgba(255,255,255,.05);border:1px solid var(--stroke);white-space:pre-wrap;
+  word-break:break-word;max-width:min(100%,74ch);
+}
+.msg.user .bubble{background:linear-gradient(135deg,rgba(91,140,255,.22),rgba(34,211,238,.14));border-color:rgba(91,140,255,.34)}
+.msg.bot .bubble b{color:#d5cbff}
+.msg.sys .bubble{background:rgba(251,191,36,.1);border-color:rgba(251,191,36,.3);color:#fde68a;font-size:12.5px}
+.chat-input{display:flex;gap:9px;align-items:flex-end}
+.chat-input textarea{min-height:52px;max-height:170px}
+.suggestions{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px}
+
+/* ---------- modal ---------- */
+.modal{
+  position:fixed;inset:0;z-index:120;display:none;place-items:center;padding:18px;
+  background:rgba(3,5,10,.72);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+}
+.modal.open{display:grid;animation:fade .22s ease both}
+.modal-box{
+  width:min(760px,100%);max-height:88vh;display:flex;flex-direction:column;
+  background:linear-gradient(165deg,#12172a,#0b1020);
+  border:1px solid var(--stroke-2);border-radius:22px;box-shadow:0 40px 90px -30px #000;
+  overflow:hidden;animation:pop .25s ease both;
+}
+.modal-head{display:flex;align-items:center;gap:12px;padding:16px 18px;border-bottom:1px solid var(--stroke)}
+.modal-head h3{margin:0;font-size:15px;flex:1 1 auto}
+.modal-body{padding:18px;overflow:auto}
+.modal-foot{padding:14px 18px;border-top:1px solid var(--stroke);display:flex;gap:9px;flex-wrap:wrap;justify-content:flex-end}
+.letter{
+  white-space:pre-wrap;font-size:13px;line-height:1.65;background:rgba(4,7,14,.8);
+  border:1px solid var(--stroke);border-radius:14px;padding:15px;max-height:52vh;overflow:auto;
+  font-family:var(--mono);color:#d9e2f5;
+}
+.close-x{
+  border:0;background:rgba(255,255,255,.07);color:var(--muted);width:32px;height:32px;
+  border-radius:10px;cursor:pointer;font-size:16px;line-height:1;display:grid;place-items:center;
+}
+.close-x:hover{background:rgba(255,255,255,.14);color:#fff}
+
+/* ---------- toasts ---------- */
+.toasts{position:fixed;right:14px;bottom:14px;z-index:200;display:grid;gap:9px;max-width:min(380px,calc(100vw - 28px))}
+.toast{
+  padding:12px 15px;border-radius:14px;font-size:13px;font-weight:600;
+  background:rgba(16,22,38,.96);border:1px solid var(--stroke-2);
+  box-shadow:0 20px 45px -20px #000;color:var(--text);
+  animation:slideIn .3s cubic-bezier(.2,.8,.2,1) both;display:flex;gap:9px;align-items:flex-start;
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+}
+.toast.ok{border-color:rgba(52,211,153,.45);box-shadow:0 20px 45px -20px #000,inset 0 0 0 1px rgba(52,211,153,.12)}
+.toast.bad{border-color:rgba(251,113,133,.5)}
+.toast.warn{border-color:rgba(251,191,36,.5)}
+.toast svg{width:15px;height:15px;flex:0 0 auto;margin-top:2px}
+.toast.out{animation:slideOut .25s ease forwards}
+@keyframes slideIn{from{opacity:0;transform:translateX(26px) scale(.97)}to{opacity:1;transform:none}}
+@keyframes slideOut{to{opacity:0;transform:translateX(26px) scale(.97)}}
+
+/* ---------- misc ---------- */
+.banner{
+  display:flex;gap:11px;align-items:flex-start;padding:13px 15px;border-radius:15px;font-size:12.8px;
+  background:linear-gradient(120deg,rgba(251,191,36,.14),rgba(124,92,255,.1));
+  border:1px solid rgba(251,191,36,.3);color:#f6e6bd;margin-bottom:16px;
+}
+.banner svg{width:16px;height:16px;flex:0 0 auto;margin-top:2px}
+.banner.info{background:linear-gradient(120deg,rgba(34,211,238,.12),rgba(124,92,255,.1));border-color:rgba(34,211,238,.28);color:#c8ecf7}
+.hr{height:1px;background:var(--stroke);margin:16px 0;border:0}
+.muted{color:var(--muted)}
+.tiny{font-size:11.5px;color:var(--muted-2)}
+.code{
+  font-family:var(--mono);font-size:11.5px;background:rgba(0,0,0,.45);border:1px solid var(--stroke);
+  padding:2px 6px;border-radius:6px;color:#b9c6e6;word-break:break-all;
+}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:12.5px}
+.kv dt{color:var(--muted-2)}
+.kv dd{margin:0;color:var(--text)}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.self-test-result{display:grid;gap:8px}
+.tr{display:flex;gap:9px;align-items:flex-start;font-size:13px;padding:9px 11px;border-radius:11px;background:rgba(255,255,255,.04);border:1px solid var(--stroke)}
+.tr .st{font-weight:800;font-size:11px;padding:2px 7px;border-radius:6px;flex:0 0 auto}
+.tr.pass .st{background:rgba(52,211,153,.16);color:#6ee7b7}
+.tr.fail .st{background:rgba(251,113,133,.18);color:#fda4af}
+.tr .detail{color:var(--muted);font-size:11.5px;margin-top:2px}
+
+/* ---------- responsive ---------- */
+@media (max-width:1080px){
+  .kpi-grid{grid-template-columns:repeat(2,1fr)}
+  .grid-3{grid-template-columns:1fr}
+}
+@media (max-width:860px){
+  .grid-2{grid-template-columns:1fr}
+  .topbar{flex-wrap:wrap;padding-bottom:8px}
+  .nav{order:3;width:100%;flex:1 0 100%}
+  .nav button{flex:0 0 auto}
+  main{padding-top:16px}
+  .ring{width:126px;height:126px}
+  .ring .ring-num{font-size:25px}
+}
+@media (max-width:600px){
+  .kpi-grid{grid-template-columns:1fr 1fr;gap:10px}
+  .kpi{padding:13px 13px 12px;border-radius:16px}
+  .kpi .kpi-value{font-size:26px}
+  .card{padding:16px;border-radius:18px}
+  .row,.row-3{grid-template-columns:1fr}
+  .hero h1{font-size:25px}
+  .hero-actions .btn{flex:1 1 auto}
+  .chart{height:120px}
+  .chart .cl{font-size:8px}
+  .brand-name{font-size:15px}
+  .topbar .btn.self-test{padding:8px 11px;font-size:12px}
+  .toasts{left:12px;right:12px;bottom:12px;max-width:none}
+  .modal-box{max-height:92vh;border-radius:18px}
+  .req-actions .btn{flex:1 1 auto}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.001ms !important;transition-duration:.001ms !important}
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand" id="brand" title="На главную">
+    <div class="brand-logo" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#0a0a14" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 3l7 4v5c0 4.5-3 7.6-7 9-4-1.4-7-4.5-7-9V7l7-4z"/>
+        <path d="M9 12.5l2 2 4-4.5"/>
+      </svg>
+    </div>
+    <div>
+      <div class="brand-name">Data<span>Cleaner</span></div>
+    </div>
+    <span class="badge-mode" id="mode-badge">local</span>
+  </div>
+
+  <nav class="nav" id="nav" aria-label="Разделы">
+    <button data-view="dashboard" class="active">Обзор</button>
+    <button data-view="profile">Профиль</button>
+    <button data-view="catalog">Каталог</button>
+    <button data-view="requests">Запросы</button>
+    <button data-view="ai">AI-помощник</button>
+    <button data-view="data">Данные</button>
+  </nav>
+
+  <button class="btn ghost sm self-test" id="btn-self-test" title="Проверить логику приложения">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+    Самопроверка
+  </button>
+</header>
+
+<main>
+  <!-- ===================== ОБЗОР ===================== -->
+  <section class="view active" id="view-dashboard">
+    <div class="hero">
+      <div>
+        <h1>Ваши данные — <em>только ваши</em></h1>
+        <p>Отправляйте требования об удалении по 152-ФЗ, GDPR и CCPA, следите за сроками 30 дней и видьте реальную картину: сколько сервисов ответило, сколько удалило и где пора жаловаться регулятору.</p>
+      </div>
+      <div class="hero-actions">
+        <button class="btn" id="btn-demo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg>
+          Демо-статистика
+        </button>
+        <button class="btn primary" id="btn-new-request">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+          Новый запрос
+        </button>
+      </div>
+    </div>
+
+    <div id="demo-banner"></div>
+
+    <div class="kpi-grid">
+      <div class="kpi acc">
+        <div class="glow" style="background:#7c5cff"></div>
+        <div class="kpi-top">
+          <div class="kpi-label">Отправлено</div>
+          <div class="kpi-dot" style="color:#b9a7ff">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+          </div>
+        </div>
+        <div class="kpi-value" id="kpi-sent">0</div>
+        <div class="kpi-hint" id="kpi-sent-hint">писем и обращений</div>
+      </div>
+      <div class="kpi warn">
+        <div class="glow" style="background:#fbbf24"></div>
+        <div class="kpi-top">
+          <div class="kpi-label">Ждут ответа</div>
+          <div class="kpi-dot" style="color:#fcd34d">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+          </div>
+        </div>
+        <div class="kpi-value" id="kpi-waiting">0</div>
+        <div class="kpi-hint" id="kpi-waiting-hint">в пределах 30 дней</div>
+      </div>
+      <div class="kpi bad">
+        <div class="glow" style="background:#fb7185"></div>
+        <div class="kpi-top">
+          <div class="kpi-label">Просрочено</div>
+          <div class="kpi-dot" style="color:#fda4af">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.6L2.5 17a2 2 0 0 0 1.7 3h15.6a2 2 0 0 0 1.7-3L13.7 3.6a2 2 0 0 0-3.4 0z"/></svg>
+          </div>
+        </div>
+        <div class="kpi-value" id="kpi-overdue">0</div>
+        <div class="kpi-hint" id="kpi-overdue-hint">срок ответа истёк</div>
+      </div>
+      <div class="kpi ok">
+        <div class="glow" style="background:#34d399"></div>
+        <div class="kpi-top">
+          <div class="kpi-label">Удалено</div>
+          <div class="kpi-dot" style="color:#6ee7b7">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+          </div>
+        </div>
+        <div class="kpi-value" id="kpi-deleted">0</div>
+        <div class="kpi-hint" id="kpi-deleted-hint">подтверждено сервисами</div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <h3>Процент удаления</h3>
+        <p class="sub">Доля удалённых запросов среди всех, что вы уже отправили.</p>
+        <div class="ring-wrap">
+          <div class="ring" id="ring">
+            <div class="ring-center">
+              <div class="ring-num" id="ring-num">0%</div>
+              <div class="ring-cap">удалено</div>
+            </div>
+          </div>
+          <div class="ring-legend">
+            <div class="legend-row"><span class="legend-dot" style="background:linear-gradient(135deg,#34d399,#22d3ee)"></span>Удалено <b id="lg-deleted">0</b></div>
+            <div class="legend-row"><span class="legend-dot" style="background:linear-gradient(135deg,#fbbf24,#f472b6)"></span>Ответили <b id="lg-responded">0</b></div>
+            <div class="legend-row"><span class="legend-dot" style="background:linear-gradient(135deg,#fb7185,#a855f7)"></span>Отказ <b id="lg-refused">0</b></div>
+            <div class="legend-row"><span class="legend-dot" style="background:rgba(255,255,255,.2)"></span>Черновики <b id="lg-drafts">0</b></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Скорость ответов</h3>
+        <p class="sub">Среднее время от отправки до реакции сервиса.</p>
+        <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:6px">
+          <div style="font-size:44px;font-weight:800;letter-spacing:-2px;line-height:1;background:var(--grad-2);-webkit-background-clip:text;background-clip:text;color:transparent;font-variant-numeric:tabular-nums" id="avg-days">—</div>
+          <div class="muted" style="font-size:13px">дней в среднем</div>
+        </div>
+        <p class="tiny" style="margin:0 0 14px" id="avg-note">Пока нет ответов от сервисов.</p>
+        <div class="funnel" id="rate-bars"></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <h3>Воронка по этапам</h3>
+      <p class="sub">Черновик → Отправлено → Ответили → Удалено. Отказ — отдельная ветка.</p>
+      <div class="funnel" id="funnel"></div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <h3>Активность за 14 дней</h3>
+        <p class="sub">Сколько запросов вы отправляли каждый день.</p>
+        <div class="chart" id="chart"></div>
+      </div>
+      <div class="card">
+        <h3>По категориям</h3>
+        <p class="sub">Где сосредоточены ваши данные.</p>
+        <div class="funnel" id="categories"></div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <h3>Дедлайны</h3>
+        <p class="sub">30 дней с даты получения требования (ст. 20 152-ФЗ, Art. 12(3) GDPR).</p>
+        <div class="dl-list" id="deadlines"></div>
+      </div>
+      <div class="card">
+        <h3>Что делать дальше</h3>
+        <p class="sub">Подсказки по вашей текущей ситуации.</p>
+        <div class="tips" id="tips"></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <h3>Приватность по умолчанию</h3>
+      <p class="tiny" style="margin:0" id="privacy-note">
+        «Прочитано» не отслеживается: DataCleaner не вставляет трекинг-пиксели, внешние картинки и редирект-ссылки в письма — получатель не должен быть объектом слежки. Учитываются только ответы сервисов и подтверждения удаления.
+      </p>
+    </div>
+  </section>
+
+  <!-- ===================== ПРОФИЛЬ ===================== -->
+  <section class="view" id="view-profile">
+    <div class="hero">
+      <div>
+        <h1>Профиль</h1>
+        <p>Введите только то, что нужно для поиска. Данные подставляются в письма локально — в AI-модель они не уходят.</p>
+      </div>
+    </div>
+
+    <div class="banner info">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16v-4"/><path d="M12 8h.01"/><circle cx="12" cy="12" r="9"/></svg>
+      <div id="storage-note">В браузерной версии данные лежат в localStorage вашего устройства. В серверной — в SQLite, зашифрованные Fernet (AES-128-CBC + HMAC). Полей, которые не заполнены, в письме просто не будет.</div>
+    </div>
+
+    <form class="card" id="profile-form" autocomplete="off">
+      <h3>Персональные данные</h3>
+      <p class="sub">Все поля необязательные, кроме ФИО и хотя бы одного email — без них письмо получится безымянным.</p>
+      <div class="row">
+        <div class="field">
+          <label for="pf-name">ФИО полностью</label>
+          <input type="text" id="pf-name" placeholder="Иванов Иван Иванович">
+          <div class="help">Как в документах — брокеры ищут по точному совпадению.</div>
+        </div>
+        <div class="field">
+          <label for="pf-birth">Год рождения</label>
+          <input type="text" id="pf-birth" inputmode="numeric" maxlength="4" placeholder="1990">
+          <div class="help">Помогает отличить вас от однофамильцев.</div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label for="pf-emails">Email (через запятую)</label>
+          <input type="text" id="pf-emails" placeholder="ivan@example.com, ivan.work@example.com">
+          <div class="help">Первый адрес используется для ответа оператора.</div>
+        </div>
+        <div class="field">
+          <label for="pf-phones">Телефоны (через запятую)</label>
+          <input type="text" id="pf-phones" placeholder="+7 900 000-00-00">
+          <div class="help">Лучше в формате, в котором они попадают в базы.</div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label for="pf-city">Город</label>
+          <input type="text" id="pf-city" placeholder="Петрозаводск">
+        </div>
+        <div class="field">
+          <label for="pf-address">Адрес (необязательно)</label>
+          <input type="text" id="pf-address" placeholder="ул. Ленина, 1, кв. 1">
+          <div class="help">Добавляйте, только если он уже засветился в базах.</div>
+        </div>
+      </div>
+      <div class="field" style="max-width:280px">
+        <label for="pf-lang">Язык писем по умолчанию</label>
+        <select id="pf-lang">
+          <option value="ru">Русский (152-ФЗ)</option>
+          <option value="en">English (GDPR / CCPA)</option>
+        </select>
+      </div>
+      <div class="inline">
+        <button class="btn primary" type="submit">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+          Сохранить профиль
+        </button>
+        <button class="btn ghost" type="button" id="btn-profile-clear">Очистить форму</button>
+        <span class="tiny" id="profile-saved-at"></span>
+      </div>
+    </form>
+
+    <div class="card" style="margin-top:16px">
+      <h3>Что попадёт в письмо</h3>
+      <p class="sub">Предпросмотр блока с персональными данными — пустые поля не выводятся.</p>
+      <div class="letter" id="profile-preview" style="max-height:240px">Заполните профиль, чтобы увидеть предпросмотр.</div>
+    </div>
+  </section>
+
+  <!-- ===================== КАТАЛОГ ===================== -->
+  <section class="view" id="view-catalog">
+    <div class="hero">
+      <div>
+        <h1>Каталог сервисов</h1>
+        <p>Брокеры данных, people-search, маркетинговые базы и поисковики. Ссылки нужно проверять: сервисы меняют адреса форм и политики.</p>
+      </div>
+      <div class="hero-actions">
+        <button class="btn" id="btn-add-broker">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+          Свой сервис
+        </button>
+      </div>
+    </div>
+
+    <div class="banner">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.6L2.5 17a2 2 0 0 0 1.7 3h15.6a2 2 0 0 0 1.7-3L13.7 3.6a2 2 0 0 0-3.4 0z"/></svg>
+      <div>Точные URL и email меняются, а часть сервисов ограничивает opt-out по региону. Перед отправкой откройте ссылку и убедитесь, что форма/адрес актуальны — в карточках это помечено как «проверить перед использованием».</div>
+    </div>
+
+    <div class="chips" id="cat-filters">
+      <button class="chip active" data-cat="all">Все</button>
+      <button class="chip" data-cat="people_search">People-search</button>
+      <button class="chip" data-cat="data_broker">Брокеры данных</button>
+      <button class="chip" data-cat="marketing">Маркетинг</button>
+      <button class="chip" data-cat="search">Поисковики</button>
+      <button class="chip" data-cat="custom">Свои</button>
+    </div>
+
+    <div class="brokers" id="broker-list"></div>
+  </section>
+
+  <!-- ===================== ЗАПРОСЫ ===================== -->
+  <section class="view" id="view-requests">
+    <div class="hero">
+      <div>
+        <h1>Запросы</h1>
+        <p>Черновик → Отправлено → Ответили → Удалено. Ветка «Отказ» и кнопка «Повторить» возвращают запрос в черновик. История изменений хранится у каждого запроса.</p>
+      </div>
+      <div class="hero-actions">
+        <button class="btn primary" id="btn-new-request-2">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+          Новый запрос
+        </button>
+      </div>
+    </div>
+
+    <div class="chips" id="status-filters">
+      <button class="chip active" data-status="all">Все</button>
+      <button class="chip" data-status="draft">Черновики</button>
+      <button class="chip" data-status="sent">Отправлено</button>
+      <button class="chip" data-status="responded">Ответили</button>
+      <button class="chip" data-status="deleted">Удалено</button>
+      <button class="chip" data-status="refused">Отказ</button>
+    </div>
+
+    <div class="stack" id="request-list" style="margin-top:16px"></div>
+  </section>
+
+  <!-- ===================== AI ===================== -->
+  <section class="view" id="view-ai">
+    <div class="hero">
+      <div>
+        <h1>AI-помощник</h1>
+        <p>Подскажет, как правильно составить требование, сослаться на норму и что делать, если оператор молчит. Персональные данные в модель не отправляются.</p>
+      </div>
+      <div class="hero-actions">
+        <button class="btn ghost" id="btn-ai-settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1A1.7 1.7 0 0 0 8.9 19a1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 4.5 15a1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 9 4.6 1.7 1.7 0 0 0 10 3.1V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1A1.7 1.7 0 0 0 19.4 9c.2.6.8 1 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+          Настройки
+        </button>
+        <button class="btn ghost" id="btn-ai-clear">Очистить чат</button>
+      </div>
+    </div>
+
+    <div class="banner info" id="ai-status-banner">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16v-4"/><path d="M12 8h.01"/><circle cx="12" cy="12" r="9"/></svg>
+      <div id="ai-status-text">Проверяю настройки AI…</div>
+    </div>
+
+    <div class="card">
+      <div class="chat" id="chat"></div>
+      <div class="suggestions">
+        <button class="chip" data-q="Оператор не ответил за 30 дней — какие шаги и куда жаловаться?">Не ответили 30 дней</button>
+        <button class="chip" data-q="Как сослаться на ст. 21 152-ФЗ, если данные в общедоступном источнике?">Данные «общедоступны»</button>
+        <button class="chip" data-q="Что писать в запросе по CCPA, если я не в Калифорнии?">CCPA не из США</button>
+        <button class="chip" data-q="Как уменьшить цифровой след за месяц: план по шагам">План на месяц</button>
+      </div>
+      <div class="chat-input">
+        <textarea id="chat-input" rows="2" placeholder="Спросите: «Что делать, если брокер отказал со ссылкой на First Amendment?»"></textarea>
+        <button class="btn primary" id="btn-ai-send" style="height:48px">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+          Спросить
+        </button>
+      </div>
+      <p class="tiny" style="margin:10px 0 0">Фильтр ПД проверяет вопрос локально: если в тексте есть email, телефон или номер документа — запрос в модель не уходит. Ответы AI — информационная справка, не юридическое заключение.</p>
+    </div>
+  </section>
+
+  <!-- ===================== ДАННЫЕ ===================== -->
+  <section class="view" id="view-data">
+    <div class="hero">
+      <div>
+        <h1>Ваши данные</h1>
+        <p>Экспорт, полная очистка и настройки хранения. Всё, что вы видите, можно удалить одной кнопкой.</p>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <h3>Экспорт</h3>
+        <p class="sub">JSON с профилем, запросами, текстами писем и историей. В файле будут ваши ПД в открытом виде — храните его как конфиденциальный документ.</p>
+        <div class="inline">
+          <button class="btn" id="btn-export">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+            Скачать JSON
+          </button>
+          <button class="btn" id="btn-backup">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4z"/><path d="M8 4v8h8V4"/><path d="M8 16h8"/></svg>
+            Копировать в буфер
+          </button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Полная очистка</h3>
+        <p class="sub">Удаляет профиль, все запросы, историю и ваши сервисы. Действие необратимо.</p>
+        <div class="inline">
+          <button class="btn danger" id="btn-wipe">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+            Удалить всё
+          </button>
+        </div>
+        <p class="tiny" style="margin:12px 0 0" id="wipe-note">В браузерной версии очищается localStorage, в серверной — таблицы SQLite (профиль, запросы, события, свои сервисы).</p>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <h3>Как хранятся данные</h3>
+      <dl class="kv" id="storage-kv"></dl>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <h3>Чего этот сервис не делает</h3>
+      <div class="tips" style="margin-top:10px">
+        <div class="tip">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+          <div>Не ставит трекинг-пиксели и не отслеживает «прочитано» — это нарушает приватность получателя.</div>
+        </div>
+        <div class="tip">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+          <div>Не отправляет ваши ПД в AI-модель: фильтр блокирует вопросы с email/телефоном, письма собираются локально.</div>
+        </div>
+        <div class="tip">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+          <div>Не ходит в сторонние трекеры и не грузит внешние скрипты — в файле нет ни одного внешнего ресурса.</div>
+        </div>
+        <div class="tip warn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.6L2.5 17a2 2 0 0 0 1.7 3h15.6a2 2 0 0 0 1.7-3L13.7 3.6a2 2 0 0 0-3.4 0z"/></svg>
+          <div>Не гарантирует удаление: результат зависит от оператора. Задача сервиса — сделать процедуру корректной и отслеживаемой.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<div class="modal" id="modal" role="dialog" aria-modal="true">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 id="modal-title">Окно</h3>
+      <button class="close-x" id="modal-close" aria-label="Закрыть">✕</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-foot" id="modal-foot"></div>
+  </div>
+</div>
+<script>
+/* ---------- 01-core.js ---------- */
+/* ==================================================================
+   DataCleaner · 01-core.js — утилиты и чистая логика.
+   Блок не обращается к DOM и к сети: его прогоняет «Самопроверка».
+   ================================================================== */
+(function () {
+  'use strict';
+
+  /* ============================ УТИЛИТЫ ============================ */
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+  function clean(v) { return (v == null ? '' : String(v)).trim(); }
+  function listOf(v) {
+    if (v == null) return [];
+    var parts = Array.isArray(v) ? v : String(v).replace(/;/g, ',').split(',');
+    var out = [];
+    parts.forEach(function (p) { p = clean(p); if (p && out.indexOf(p) === -1) out.push(p); });
+    return out;
+  }
+  function isoDay(d) {
+    var y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0'), dd = String(d.getDate()).padStart(2, '0');
+    return y + '-' + m + '-' + dd;
+  }
+  function todayDate() { var d = new Date(); return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
+  function parseDay(s) {
+    if (!s) return null;
+    var m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return null;
+    return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  }
+  function addDays(d, n) { var x = new Date(d.getTime()); x.setDate(x.getDate() + n); return x; }
+  function daysBetween(a, b) { return Math.round((b.getTime() - a.getTime()) / 86400000); }
+  function fmtDate(s) {
+    var d = parseDay(s);
+    if (!d) return '—';
+    return d.toLocaleDateString('ru-RU', { day: '2-digit', month: 'short', year: 'numeric' });
+  }
+  function fmtDateTime(s) {
+    if (!s) return '—';
+    var d = new Date(s);
+    if (isNaN(d.getTime())) return fmtDate(s);
+    return d.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  }
+  function plural(n, one, few, many) {
+    var m10 = n % 10, m100 = n % 100;
+    if (m10 === 1 && m100 !== 11) return one;
+    if (m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20)) return few;
+    return many;
+  }
+
+  /* ======================= СТАТУСЫ И КАТЕГОРИИ ======================= */
+  var STATUS_LABELS = { draft: 'Черновик', sent: 'Отправлено', responded: 'Ответили', deleted: 'Удалено', refused: 'Отказ' };
+  var STATUS_CLASS = { draft: 'neutral', sent: 'acc', responded: 'warn', deleted: 'ok', refused: 'bad' };
+  var CATEGORY_LABELS = {
+    people_search: 'People-search', data_broker: 'Брокеры данных',
+    marketing: 'Маркетинг', search: 'Поисковики', custom: 'Свои сервисы'
+  };
+  var METHOD_LABELS = { email: 'письмо на email', form: 'форма на сайте', manual: 'вручную' };
+
+  var TRANSITIONS = {
+    draft: ['sent'],
+    sent: ['responded', 'deleted', 'refused', 'draft'],
+    responded: ['deleted', 'refused', 'draft'],
+    refused: ['deleted', 'draft'],
+    deleted: ['draft']
+  };
+  function canTransition(from, to) {
+    if (to === from) return true;
+    return (TRANSITIONS[from] || []).indexOf(to) !== -1;
+  }
+
+  /* ---- встроенный каталог (аналог app/brokers.json) ---- */
+  var BUILTIN_BROKERS = [
+    { id: 'spokeo', name: 'Spokeo', category: 'people_search', method: 'form', url: 'https://www.spokeo.com/optout', email: '', language: 'en', deadline_days: 30, verify: true, notes: 'Крупный people-search агрегатор (США). Удаление через форму opt-out: найти свою карточку по URL профиля.' },
+    { id: 'whitepages', name: 'Whitepages', category: 'people_search', method: 'form', url: 'https://www.whitepages.com/suppression-requests', email: '', language: 'en', deadline_days: 30, verify: true, notes: 'Форма suppression request: подтверждение приходит на email или по телефону.' },
+    { id: 'truepeoplesearch', name: 'TruePeopleSearch', category: 'people_search', method: 'form', url: 'https://www.truepeoplesearch.com/removal', email: '', language: 'en', deadline_days: 30, verify: true, notes: 'Бесплатный people-search. Форма удаления по URL записи, обычно удаляют за 72 часа.' },
+    { id: 'radaris', name: 'Radaris', category: 'people_search', method: 'form', url: 'https://radaris.com/control/privacy', email: '', language: 'en', deadline_days: 30, verify: true, notes: 'Требует регистрации/подтверждения для opt-out.' },
+    { id: 'intelius', name: 'Intelius', category: 'people_search', method: 'form', url: 'https://www.intelius.com/opt-out/', email: '', language: 'en', deadline_days: 45, verify: true, notes: 'Группа PeopleConnect: один opt-out может покрыть несколько брендов.' },
+    { id: 'beenverified', name: 'BeenVerified', category: 'people_search', method: 'form', url: 'https://www.beenverified.com/app/optout/search', email: '', language: 'en', deadline_days: 45, verify: true, notes: 'PeopleConnect. Жителям Калифорнии дополнительно помогает CCPA/CPRA.' },
+    { id: 'acxiom', name: 'Acxiom', category: 'data_broker', method: 'form', url: 'https://isapps.acxiom.com/optout/optout.aspx', email: '', language: 'en', deadline_days: 45, verify: true, notes: 'Крупный маркетинговый брокер. Opt-out ограничивает продажу/маркетинг, но не всегда значит полное удаление.' },
+    { id: 'liveramp', name: 'LiveRamp', category: 'marketing', method: 'form', url: 'https://liveramp.com/opt_out/', email: 'privacy@liveramp.com', language: 'en', deadline_days: 45, verify: true, notes: 'Identity-граф для рекламы: форма opt-out + письмо по GDPR/CCPA.' },
+    { id: 'google-search', name: 'Google (удаление из выдачи)', category: 'search', method: 'form', url: 'https://reportcontent.google.com/forms/rtbf', email: '', language: 'en', deadline_days: 30, verify: true, notes: 'Удаление конкретных URL из поиска. Это не удаление у первоисточника: сначала требуйте удаления у сайта.' },
+    { id: 'yandex-search', name: 'Яндекс (удаление из выдачи)', category: 'search', method: 'form', url: 'https://yandex.ru/support/search/request/remove-personal-data.html', email: '', language: 'ru', deadline_days: 30, verify: true, notes: 'Заявление об удалении ссылок с ПД из результатов поиска (152-ФЗ). Адрес формы проверяйте: Яндекс его меняет.' },
+    { id: 'ru-152-template', name: 'Российский сервис (шаблон 152-ФЗ)', category: 'data_broker', method: 'email', url: '', email: 'privacy@example.ru', language: 'ru', deadline_days: 30, verify: true, notes: 'ШАБЛОН: замените privacy@example.ru на адрес оператора из его политики обработки ПД и переименуйте сервис.' },
+    { id: 'eu-gdpr-template', name: 'Европейский сервис (шаблон GDPR)', category: 'data_broker', method: 'email', url: '', email: 'dpo@example.eu', language: 'en', deadline_days: 30, verify: true, notes: 'ШАБЛОН: замените dpo@example.eu на адрес DPO/privacy из политики конфиденциальности сервиса.' },
+    { id: 'ru-marketing-template', name: 'Российская маркетинговая база (шаблон)', category: 'marketing', method: 'email', url: '', email: 'privacy@example.ru', language: 'ru', deadline_days: 30, verify: true, notes: 'ШАБЛОН для рассылочных баз и колл-центров: отзыв согласия и требование прекратить обработку (ст. 9, 21 152-ФЗ).' }
+  ];
+
+  var LEGAL_RU = [
+    'ст. 14 152-ФЗ — право субъекта на доступ к своим персональным данным',
+    'ст. 21 152-ФЗ — обязанность оператора прекратить обработку и уничтожить данные',
+    'ст. 9 152-ФЗ — отзыв согласия на обработку',
+    'ст. 20 152-ФЗ — срок ответа на запрос субъекта'
+  ];
+  var LEGAL_EN = [
+    'Art. 15 GDPR — right of access',
+    'Art. 17 GDPR — right to erasure',
+    'Art. 21 GDPR — right to object',
+    'Art. 12(3) GDPR — ответ в течение одного месяца',
+    'CCPA/CPRA §1798.105 — right to delete, §1798.130 — срок 45 дней'
+  ];
+
+  function piiRows(profile, lang) {
+    profile = profile || {};
+    var rows = [], name = clean(profile.full_name), emails = listOf(profile.emails),
+        phones = listOf(profile.phones), city = clean(profile.city),
+        year = clean(profile.birth_year), address = clean(profile.address);
+    if (lang === 'ru') {
+      if (name) rows.push('ФИО: ' + name);
+      if (emails.length) rows.push('Адрес электронной почты: ' + emails.join(', '));
+      if (phones.length) rows.push('Номер телефона: ' + phones.join(', '));
+      if (year) rows.push('Год рождения: ' + year);
+      if (city) rows.push('Город: ' + city);
+      if (address) rows.push('Адрес: ' + address);
+    } else {
+      if (name) rows.push('Full name: ' + name);
+      if (emails.length) rows.push('Email address(es): ' + emails.join(', '));
+      if (phones.length) rows.push('Phone number(s): ' + phones.join(', '));
+      if (year) rows.push('Year of birth: ' + year);
+      if (city) rows.push('City: ' + city);
+      if (address) rows.push('Postal address: ' + address);
+    }
+    return rows;
+  }
+
+  function ruDate(d) {
+    var months = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+    return d.getDate() + ' ' + months[d.getMonth()] + ' ' + d.getFullYear() + ' г.';
+  }
+  function enDate(d) {
+    var months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    return d.getDate() + ' ' + months[d.getMonth()] + ' ' + d.getFullYear();
+  }
+
+  /* ------------------------- русское письмо ------------------------- */
+  function buildRuLetter(profile, broker, today) {
+    profile = profile || {}; broker = broker || {};
+    today = today || todayDate();
+    var name = clean(profile.full_name), who = name || 'субъекта персональных данных';
+    var rows = piiRows(profile, 'ru'), emails = listOf(profile.emails), phones = listOf(profile.phones);
+    var reply = emails[0] || phones[0] || '';
+    var service = clean(broker.name) || clean(broker.id) || 'сервис';
+    var days = Number(broker.deadline_days || 30);
+    var subject = 'Требование об удалении персональных данных — ' + who;
+    var L = [];
+    L.push('Кому: ' + service + (clean(broker.email) ? ' (' + clean(broker.email) + ')' : ''));
+    L.push('От: ' + who + (reply ? ', ' + reply : ''));
+    L.push('Дата: ' + ruDate(today));
+    L.push('');
+    L.push('Здравствуйте!');
+    L.push('');
+    L.push('Я являюсь субъектом персональных данных и обращаюсь к вам как к оператору, осуществляющему обработку персональных данных (сервис: ' + service + ').');
+    L.push('');
+    if (rows.length) {
+      L.push('В вашем сервисе обрабатываются следующие мои персональные данные:');
+      L.push('');
+      rows.forEach(function (r) { L.push('  • ' + r); });
+      L.push('');
+    }
+    L.push('На основании статьи 14 Федерального закона от 27.07.2006 № 152-ФЗ «О персональных данных» прошу предоставить мне сведения, предусмотренные частью 7 указанной статьи, в том числе:');
+    L.push('  1) подтверждение факта обработки моих персональных данных;');
+    L.push('  2) правовые основания и цели обработки;');
+    L.push('  3) перечень обрабатываемых персональных данных и источники их получения;');
+    L.push('  4) сроки обработки, а также порядок и условия их прекращения;');
+    L.push('  5) сведения о лицах, которым могут быть переданы мои персональные данные.');
+    L.push('');
+    L.push('Одновременно, на основании статьи 21 152-ФЗ, требую:');
+    L.push('  1) прекратить обработку моих персональных данных;');
+    L.push('  2) уничтожить (удалить) мои персональные данные, включая их копии, резервные копии, а также данные, переданные третьим лицам и партнёрам;');
+    L.push('  3) исключить мои данные из поисковой выдачи, профилей и открытых карточек;');
+    L.push('  4) прекратить использование моих данных в целях рекламы и маркетинга и отозвать переданные ранее согласия (статья 9 152-ФЗ);');
+    L.push('  5) направить мне письменное подтверждение уничтожения персональных данных.');
+    L.push('');
+    L.push('Согласно частям 1, 3 и 5 статьи 21 152-ФЗ обработка должна быть прекращена, а персональные данные уничтожены в срок, не превышающий 30 дней с даты получения настоящего требования. Ответ на запрос субъекта персональных данных предоставляется в порядке и сроки, установленные статьёй 20 152-ФЗ.');
+    L.push('');
+    L.push(reply
+      ? 'Ответ прошу направить в письменной форме на адрес электронной почты: ' + reply + '.'
+      : 'Ответ прошу направить в письменной форме по указанным выше контактным данным.');
+    L.push('');
+    L.push('В случае неисполнения требования я оставляю за собой право обратиться в Роскомнадзор с жалобой на нарушение законодательства о персональных данных, а также в суд.');
+    L.push('');
+    L.push('Прошу не использовать мои персональные данные для иных целей, кроме рассмотрения настоящего требования.');
+    L.push('');
+    L.push('С уважением,');
+    L.push(name || 'субъект персональных данных');
+    if (reply) L.push(reply);
+    return {
+      language: 'ru', subject: subject, body: L.join('\n').replace(/\n+$/, '\n'),
+      legal: LEGAL_RU.slice(), deadline_days: days,
+      deadline_date: isoDay(addDays(today, days))
+    };
+  }
+
+  /* ------------------------ английское письмо ------------------------ */
+  function buildEnLetter(profile, broker, today) {
+    profile = profile || {}; broker = broker || {};
+    today = today || todayDate();
+    var name = clean(profile.full_name), who = name || 'a data subject';
+    var rows = piiRows(profile, 'en'), emails = listOf(profile.emails), phones = listOf(profile.phones);
+    var reply = emails[0] || phones[0] || '';
+    var service = clean(broker.name) || clean(broker.id) || 'the service';
+    var days = Number(broker.deadline_days || 30);
+    var subject = 'Formal request for erasure of personal data (GDPR Art. 17 / CCPA §1798.105) — ' + who;
+    var L = [];
+    L.push('To: ' + service + (clean(broker.email) ? ' — ' + clean(broker.email) : ' — Privacy / DPO'));
+    L.push('From: ' + who + (reply ? ' <' + reply + '>' : ''));
+    L.push('Date: ' + enDate(today));
+    L.push('');
+    L.push('Dear Sir or Madam,');
+    L.push('');
+    L.push('I am writing to exercise my rights as a data subject under the EU General Data Protection Regulation (Regulation (EU) 2016/679) and, where applicable, the California Consumer Privacy Act as amended by the CPRA. The processing concerns the service ' + service + '.');
+    L.push('');
+    if (rows.length) {
+      L.push('The personal data concerned:');
+      L.push('');
+      rows.forEach(function (r) { L.push('  • ' + r); });
+      L.push('');
+    }
+    L.push('Under Article 15 GDPR I request confirmation of whether you process personal data concerning me, together with a copy of that data, the purposes of the processing, the categories of data, the recipients, the retention period and the source of the data.');
+    L.push('');
+    L.push('Under Article 17 GDPR I request the erasure of my personal data without undue delay, including any copies, backups, derived profiles, and data shared with third parties, affiliates and marketing partners. Under Article 21 GDPR I object to the processing of my personal data for direct marketing purposes.');
+    L.push('');
+    L.push('Where you are a business subject to the CCPA/CPRA, I request the deletion of my personal information pursuant to §1798.105 and confirmation that you have directed service providers and contractors to delete it as well. I do not wish my personal information to be sold or shared (§1798.120, §1798.121).');
+    L.push('');
+    L.push('Please confirm in writing, within one month as required by Article 12(3) GDPR (45 days under §1798.130 CCPA), that my personal data has been erased and that no further processing will take place.');
+    L.push('');
+    L.push(reply ? 'Please send your written confirmation to: ' + reply + '.' : 'Please send your written confirmation to the contact details above.');
+    L.push('');
+    L.push('I am ready to provide reasonable proof of identity if required, and I ask you not to request more personal data than is necessary to verify it.');
+    L.push('');
+    L.push('If you fail to act on this request, I reserve the right to lodge a complaint with the competent supervisory authority in my country, with the California Privacy Protection Agency or the California Attorney General, and to seek a judicial remedy.');
+    L.push('');
+    L.push('Sincerely,');
+    L.push(name || 'A data subject');
+    if (reply) L.push(reply);
+    return {
+      language: 'en', subject: subject, body: L.join('\n').replace(/\n+$/, '\n'),
+      legal: LEGAL_EN.slice(), deadline_days: days,
+      deadline_date: isoDay(addDays(today, days))
+    };
+  }
+
+  function buildLetter(profile, broker, language, today) {
+    var lang = clean(language) || clean((broker || {}).language) || clean((profile || {}).language) || 'ru';
+    if (lang !== 'ru' && lang !== 'en') lang = 'ru';
+    return lang === 'ru' ? buildRuLetter(profile, broker, today) : buildEnLetter(profile, broker, today);
+  }
+
+  /* ------------------------ PII-фильтр для AI ------------------------ */
+  var PII_PATTERNS = [
+    ['email', '[A-Za-z0-9._%+\\-]+@[A-Za-z0-9.\\-]+\\.[A-Za-z]{2,}'],
+    ['phone', '(?:\\+\\d{1,3}[\\s\\-().]*)?(?:\\(\\d{2,4}\\)[\\s\\-]*)?\\d[\\d\\s\\-().]{7,}\\d'],
+    ['card', '(?:\\d[ \\-]?){13,19}'],
+    ['snils', '\\d{3}[-\\s]?\\d{3}[-\\s]?\\d{3}[-\\s]?\\d{2}'],
+    ['passport', '\\d{2}\\s?\\d{2}\\s?(?:№|N|no\\.?)?\\s?\\d{6}']
+  ];
+  function detectPII(text) {
+    var src = text == null ? '' : String(text), found = [];
+    PII_PATTERNS.forEach(function (p) {
+      var re = new RegExp(p[1]);
+      if (re.test(src) && found.indexOf(p[0]) === -1) found.push(p[0]);
+    });
+    return found;
+  }
+  function piiWarning(kinds) {
+    return 'Похоже, в вопросе есть персональные данные (' + kinds.join(', ') + '). Запрос в AI-модель не отправлен: переписка с внешним провайдером не должна содержать ПД. Уберите email/телефон/номер документа — ФИО и контакты подставляются в письма локально, на вашем устройстве.';
+  }
+
+/* ---------- 02-stats-store.js ---------- */
+/* ==================================================================
+   DataCleaner · 02-stats-store.js — статистика, хранилище, слой API.
+   ================================================================== */
+
+  /* --------------------------- статистика --------------------------- */
+  function computeStats(requests, opts) {
+    opts = opts || {};
+    var today = opts.today || todayDate();
+    var historyDays = opts.historyDays || 14;
+    var rows = Array.isArray(requests) ? requests.slice() : [];
+    var counts = { draft: 0, sent: 0, responded: 0, deleted: 0, refused: 0 };
+    var sentCount = 0, waiting = [], overdue = [], deadlines = [], responseTimes = [];
+    var perDay = {}, perCategory = {};
+
+    rows.forEach(function (r) {
+      var st = r.status || 'draft';
+      if (counts[st] == null) counts[st] = 0;
+      counts[st] += 1;
+      var cat = r.broker_category || 'custom';
+      if (st !== 'draft') perCategory[cat] = (perCategory[cat] || 0) + 1;
+
+      var sentAt = r.sent_at ? new Date(r.sent_at) : null;
+      var respondedAt = r.responded_at ? new Date(r.responded_at) : null;
+      var deletedAt = r.deleted_at ? new Date(r.deleted_at) : null;
+      var deadline = parseDay(r.deadline_at) ||
+        (sentAt && !isNaN(sentAt.getTime()) ? addDays(parseDay(isoDay(sentAt)), Number(r.deadline_days || 30)) : null);
+
+      if (sentAt && !isNaN(sentAt.getTime())) {
+        sentCount += 1;
+        perDay[isoDay(sentAt)] = (perDay[isoDay(sentAt)] || 0) + 1;
+      }
+      if (sentAt && respondedAt && !isNaN(respondedAt.getTime())) {
+        responseTimes.push(+(((respondedAt - sentAt) / 86400000)).toFixed(1));
+      } else if (sentAt && deletedAt && st === 'deleted' && !isNaN(deletedAt.getTime())) {
+        responseTimes.push(+(((deletedAt - sentAt) / 86400000)).toFixed(1));
+      }
+
+      if (deadline && (st === 'sent' || st === 'responded' || st === 'refused')) {
+        var dl = { id: r.id, broker: r.broker_name, category: cat, status: st, deadline: isoDay(deadline), days_left: daysBetween(today, deadline) };
+        deadlines.push(dl);
+        if (st === 'sent') { (dl.days_left < 0 ? overdue : waiting).push(dl); }
+      }
+    });
+
+    deadlines.sort(function (a, b) { return a.days_left - b.days_left; });
+
+    var activity = [];
+    for (var i = historyDays - 1; i >= 0; i--) {
+      var d = isoDay(addDays(today, -i));
+      activity.push({ date: d, count: perDay[d] || 0 });
+    }
+
+    var nonDraft = rows.filter(function (r) { return (r.status || 'draft') !== 'draft'; }).length;
+    var deleted = counts.deleted || 0;
+    var deletionRate = nonDraft ? +((deleted / nonDraft) * 100).toFixed(1) : 0;
+    var answered = deleted + (counts.responded || 0) + (counts.refused || 0);
+    var responseRate = sentCount ? +((answered / sentCount) * 100).toFixed(1) : 0;
+    var total = rows.length;
+
+    var funnel = ['draft', 'sent', 'responded', 'deleted'].map(function (st) {
+      return {
+        stage: st, label: STATUS_LABELS[st], count: counts[st] || 0,
+        percent: total ? +(((counts[st] || 0) / total) * 100).toFixed(1) : 0
+      };
+    });
+
+    var byCategory = Object.keys(perCategory).map(function (c) {
+      return {
+        category: c, label: CATEGORY_LABELS[c] || c, count: perCategory[c],
+        percent: nonDraft ? +((perCategory[c] / nonDraft) * 100).toFixed(1) : 0
+      };
+    }).sort(function (a, b) { return b.count - a.count; });
+
+    var tips = [];
+    var T = {
+      overdue: function (n) { return 'Просрочено ' + n + ': оператор не ответил в срок. Напишите повторно («Повторить» в карточке запроса) и через 5–10 рабочих дней жалуйтесь: в РФ — в Роскомнадзор, в ЕС — в надзорный орган вашей страны, в США (Калифорния) — в CPPA/Attorney General.'; },
+      waiting: function (n) { return 'Ждут ответа ' + n + '. Ответ на запрос по 152-ФЗ — 10 рабочих дней (ст. 20, продлевается не более чем на 5), уничтожение данных — до 30 дней (ст. 21). В GDPR срок ответа — один месяц (Art. 12(3)). Сохраняйте подтверждение отправки: скриншот формы или заголовки письма.'; },
+      forms: function (n) { return 'Есть ' + n + ' запрос(ов) через формы и ручное удаление. По ним не будет письма-подтверждения — после отправки формы фиксируйте номер обращения в заметке к запросу.'; },
+      refused: function (n) { return 'Отказов: ' + n + '. Требуйте письменное обоснование со ссылкой на норму. Если основание «общедоступные данные» — ссылайтесь на ст. 21 152-ФЗ или Art. 17 GDPR.'; },
+      drafts: function (n) { return 'Черновиков: ' + n + '. Проверьте текст и отправьте: пока запрос в черновике, срок 30 дней не идёт.'; },
+      deleted: function (n) { return 'Удалено ' + n + '. Через 30–45 дней проверьте снова — часть брокеров возвращает данные из резервных копий.'; },
+      noprofile: function () { return 'Профиль не заполнен: в письмах не будет ФИО и контактов. Заполните раздел «Профиль» — данные остаются у вас.'; }
+    };
+    if (opts.profileFilled === false) tips.push(T.noprofile());
+    if (overdue.length) tips.push(T.overdue(overdue.length));
+    if (waiting.length) tips.push(T.waiting(waiting.length));
+    var forms = rows.filter(function (r) {
+      return (r.method === 'form' || r.method === 'manual') && (r.status || 'draft') !== 'draft';
+    }).length;
+    if (forms) tips.push(T.forms(forms));
+    if (counts.refused) tips.push(T.refused(counts.refused));
+    if (counts.draft) tips.push(T.drafts(counts.draft));
+    if (deleted) tips.push(T.deleted(deleted));
+    if (!tips.length) tips.push('Добавьте первые запросы: выберите сервис в каталоге и сгенерируйте письмо.');
+
+    var avg = responseTimes.length
+      ? +(responseTimes.reduce(function (a, b) { return a + b; }, 0) / responseTimes.length).toFixed(1)
+      : null;
+    var oldestOverdue = overdue.reduce(function (m, d) { return Math.max(m, Math.abs(d.days_left)); }, 0);
+
+    return {
+      demo: !!opts.demo,
+      generated_at: new Date().toISOString(),
+      kpi: {
+        total: total, sent: sentCount, waiting: waiting.length, overdue: overdue.length,
+        deleted: deleted, refused: counts.refused || 0, drafts: counts.draft || 0,
+        responded: counts.responded || 0,
+        deletion_rate: deletionRate, response_rate: responseRate,
+        avg_response_days: avg, oldest_overdue_days: oldestOverdue
+      },
+      funnel: funnel, activity: activity, by_category: byCategory,
+      deadlines: deadlines, waiting: waiting, overdue: overdue, tips: tips,
+      note: '«Прочитано» не отслеживается: сервис не использует трекинг-пиксели и внешние картинки в письмах. Учитываются только ответы сервисов и подтверждения удаления.'
+    };
+  }
+
+  /* ----------------------- демо-статистика ----------------------- */
+  var DEMO_SPEC = [
+    ['Spokeo', 'people_search', 'form', 'deleted', 41, 9],
+    ['Whitepages', 'people_search', 'form', 'deleted', 35, 14],
+    ['Radaris', 'people_search', 'form', 'responded', 12, 4],
+    ['Intelius', 'people_search', 'form', 'refused', 28, 6],
+    ['Acxiom', 'data_broker', 'form', 'sent', 38, null],
+    ['LiveRamp', 'marketing', 'email', 'sent', 33, null],
+    ['TruePeopleSearch', 'people_search', 'form', 'deleted', 21, 2],
+    ['Яндекс (выдача)', 'search', 'form', 'sent', 9, null],
+    ['Google (выдача)', 'search', 'form', 'sent', 6, null],
+    ['Российский сервис (152-ФЗ)', 'data_broker', 'email', 'responded', 17, 11],
+    ['Маркетинговая база', 'marketing', 'email', 'draft', null, null],
+    ['Европейский сервис (GDPR)', 'data_broker', 'email', 'sent', 2, null]
+  ];
+  function buildDemoRequests(today) {
+    today = today || todayDate();
+    return DEMO_SPEC.map(function (spec, idx) {
+      var name = spec[0], cat = spec[1], method = spec[2], status = spec[3], sentAgo = spec[4], respDays = spec[5];
+      var sentAt = sentAgo == null ? null : addDays(today, -sentAgo);
+      var deadline = sentAt ? addDays(sentAt, 30) : null;
+      var responded = sentAt && respDays != null ? addDays(sentAt, respDays) : null;
+      var deleted = status === 'deleted' ? addDays(sentAt, (respDays || 5) + 2) : null;
+      return {
+        id: 9000 + idx, broker_id: 'demo-' + idx, broker_name: name, broker_category: cat,
+        method: method, status: status, language: 'ru', deadline_days: 30,
+        sent_at: sentAt ? sentAt.toISOString() : null,
+        responded_at: responded ? responded.toISOString() : null,
+        deleted_at: deleted ? deleted.toISOString() : null,
+        deadline_at: deadline ? isoDay(deadline) : null,
+        created_at: (sentAt || new Date()).toISOString()
+      };
+    });
+  }
+
+  /* ==================== ХРАНИЛИЩЕ (localStorage) ==================== */
+  var K = {
+    profile: 'dc.v1.profile', requests: 'dc.v1.requests', brokers: 'dc.v1.brokers',
+    llm: 'dc.v1.llm', seq: 'dc.v1.seq', chat: 'dc.v1.chat', token: 'dc.v1.token'
+  };
+  var mem = {};
+  var storageOK = (function () {
+    try { var k = '__dc_test__'; localStorage.setItem(k, '1'); localStorage.removeItem(k); return true; }
+    catch (e) { return false; }
+  })();
+
+  var Store = {
+    get: function (k, def) {
+      try {
+        var raw = storageOK ? localStorage.getItem(k) : (mem[k] == null ? null : mem[k]);
+        return raw == null ? def : JSON.parse(raw);
+      } catch (e) { return def; }
+    },
+    set: function (k, v) {
+      try {
+        var raw = JSON.stringify(v);
+        if (storageOK) localStorage.setItem(k, raw); else mem[k] = raw;
+        return true;
+      } catch (e) {
+        try { mem[k] = JSON.stringify(v); } catch (e2) { /* совсем нет места */ }
+        return false;
+      }
+    },
+    del: function (k) {
+      try { if (storageOK) localStorage.removeItem(k); } catch (e) { /* ignore */ }
+      delete mem[k];
+    }
+  };
+
+  /* ============================ СОСТОЯНИЕ ============================ */
+  var state = {
+    server: false,
+    serverMeta: {},
+    view: 'dashboard',
+    profile: {},
+    profileUpdated: null,
+    brokers: [],
+    customBrokers: [],
+    requests: [],
+    llm: { base_url: 'https://tokenlavka.com/v1', api_key: '', model: 'gpt-6-luna' },
+    llmServer: { configured: false, model: null, base_url_host: null, hint: null },
+    chat: [],
+    demo: null,
+    filterCat: 'all',
+    filterStatus: 'all',
+    busy: false
+  };
+
+  /* --------------------------- HTTP-обёртка --------------------------- */
+  function accessToken() {
+    var t = Store.get(K.token, '');
+    return typeof t === 'string' ? t : '';
+  }
+
+  async function http(method, path, body) {
+    var opts = { method: method, headers: {}, cache: 'no-store' };
+    var token = accessToken();
+    if (token) opts.headers['X-Access-Token'] = token;
+    if (body !== undefined) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+    var resp = await fetch(path, opts);
+    var text = await resp.text();
+    var data = null;
+    try { data = text ? JSON.parse(text) : null; } catch (e) { data = { detail: text }; }
+    if (!resp.ok) {
+      var msg = (data && (data.detail || data.message || data.warning)) || ('HTTP ' + resp.status);
+      var err = new Error(typeof msg === 'string' ? msg : JSON.stringify(msg));
+      err.status = resp.status; err.data = data;
+      err.authRequired = !!(data && data.auth_required);
+      throw err;
+    }
+    return data;
+  }
+
+  async function detectServer() {
+    if (!/^https?:$/.test(location.protocol)) return false;
+    try {
+      var ctrl = new AbortController();
+      var t = setTimeout(function () { ctrl.abort(); }, 2500);
+      var headers = {};
+      var token = accessToken();
+      if (token) headers['X-Access-Token'] = token;
+      var r = await fetch('api/health', { cache: 'no-store', signal: ctrl.signal, headers: headers });
+      clearTimeout(t);
+      if (r.status === 401) return true; /* сервер есть, но нужен код доступа */
+      if (!r.ok) return false;
+      var j = await r.json();
+      return !!(j && j.ok);
+    } catch (e) { return false; }
+  }
+
+  function seqNext() {
+    var n = Number(Store.get(K.seq, 0) || 0) + 1;
+    Store.set(K.seq, n);
+    return n;
+  }
+  function localRequests() { return Store.get(K.requests, []) || []; }
+  function persistRequests(list) { Store.set(K.requests, list); }
+  function localEvent(req, type, from, to, note) {
+    req.events = req.events || [];
+    req.events.push({ type: type, from_status: from || '', to_status: to || '', note: note || '', at: new Date().toISOString() });
+  }
+
+  /* ============================== СЛОЙ API ==============================
+     Один интерфейс, две реализации: local (localStorage) и server (FastAPI).
+     ==================================================================== */
+  var Api = {
+    init: async function () {
+      state.server = await detectServer();
+      if (state.server) {
+        state.serverMeta = (await http('GET', 'api/health')) || {};
+        var prof = await http('GET', 'api/profile');
+        state.profile = (prof && prof.profile) || {};
+        state.profileUpdated = (prof && prof.updated_at) || null;
+        var br = await http('GET', 'api/brokers');
+        var items = (br && br.items) || [];
+        state.brokers = items;
+        state.customBrokers = items.filter(function (b) { return b.custom; });
+        var rq = await http('GET', 'api/requests');
+        state.requests = (rq && rq.items) || [];
+        state.llmServer = (await http('GET', 'api/assistant/status')) || { configured: false };
+      } else {
+        state.profile = Store.get(K.profile, {}) || {};
+        state.profileUpdated = Store.get(K.profile + '.at', null);
+        var custom = Store.get(K.brokers, []) || [];
+        state.customBrokers = custom;
+        state.brokers = BUILTIN_BROKERS.concat(custom.map(function (b) {
+          return Object.assign({}, b, { custom: true, verify: false });
+        }));
+        state.requests = localRequests();
+        state.llm = Object.assign({}, state.llm, Store.get(K.llm, {}) || {});
+        state.llmServer = { configured: !!(state.llm.base_url && state.llm.api_key && state.llm.model), local: true };
+      }
+      state.chat = Store.get(K.chat, []) || [];
+    },
+
+    profileFilled: function () {
+      return !!(clean(state.profile.full_name) && listOf(state.profile.emails).length);
+    },
+
+    saveProfile: async function (p) {
+      if (state.server) {
+        var res = await http('PUT', 'api/profile', p);
+        state.profile = p;
+        state.profileUpdated = new Date().toISOString();
+        return res;
+      }
+      state.profile = p;
+      state.profileUpdated = new Date().toISOString();
+      Store.set(K.profile, p);
+      Store.set(K.profile + '.at', state.profileUpdated);
+      return { ok: true, detail: 'Профиль сохранён в localStorage этого устройства.' };
+    },
+
+    addBroker: async function (b) {
+      if (state.server) {
+        var res = await http('POST', 'api/brokers', b);
+        var br = await http('GET', 'api/brokers');
+        state.brokers = (br && br.items) || [];
+        state.customBrokers = state.brokers.filter(function (x) { return x.custom; });
+        return res;
+      }
+      var custom = Store.get(K.brokers, []) || [];
+      if (state.brokers.some(function (x) { return x.id === b.id; })) throw new Error('Сервис с таким id уже есть');
+      custom.push(b);
+      Store.set(K.brokers, custom);
+      state.customBrokers = custom;
+      state.brokers = BUILTIN_BROKERS.concat(custom.map(function (x) {
+        return Object.assign({}, x, { custom: true, verify: false });
+      }));
+      return { ok: true };
+    },
+
+    deleteBroker: async function (id) {
+      if (state.server) {
+        var res = await http('DELETE', 'api/brokers/' + encodeURIComponent(id));
+        var br = await http('GET', 'api/brokers');
+        state.brokers = (br && br.items) || [];
+        state.customBrokers = state.brokers.filter(function (x) { return x.custom; });
+        return res;
+      }
+      var custom = (Store.get(K.brokers, []) || []).filter(function (b) { return b.id !== id; });
+      Store.set(K.brokers, custom);
+      state.customBrokers = custom;
+      state.brokers = BUILTIN_BROKERS.concat(custom.map(function (x) {
+        return Object.assign({}, x, { custom: true, verify: false });
+      }));
+      return { ok: true };
+    },
+
+    createRequest: async function (brokerId, language) {
+      var broker = state.brokers.filter(function (b) { return b.id === brokerId; })[0];
+      if (!broker) throw new Error('Сервис не найден');
+      if (state.server) {
+        var res = await http('POST', 'api/requests', { broker_id: brokerId, language: language || null });
+        var rq = await http('GET', 'api/requests');
+        state.requests = (rq && rq.items) || [];
+        return res;
+      }
+      var letter = buildLetter(state.profile, broker, language);
+      var req = {
+        id: seqNext(), broker_id: broker.id, broker_name: broker.name,
+        broker_category: broker.category || 'data_broker', method: broker.method || 'email',
+        to_email: broker.email || '', language: letter.language,
+        subject: letter.subject, body: letter.body, status: 'draft',
+        deadline_days: letter.deadline_days, deadline_at: letter.deadline_date,
+        created_at: new Date().toISOString(), sent_at: null, responded_at: null,
+        deleted_at: null, note: '', error: '', events: []
+      };
+      localEvent(req, 'created', '', 'draft', 'Запрос создан');
+      var list = localRequests(); list.push(req); persistRequests(list);
+      state.requests = list;
+      return { ok: true, request: req, letter: letter };
+    },
+
+    getRequestFull: async function (id) {
+      if (state.server) return await http('GET', 'api/requests/' + id);
+      var req = state.requests.filter(function (r) { return String(r.id) === String(id); })[0];
+      if (!req) throw new Error('Запрос не найден');
+      return {
+        request: req,
+        letter: { language: req.language, subject: req.subject, body: req.body },
+        events: req.events || []
+      };
+    },
+
+    send: async function (id) {
+      if (state.server) {
+        var res = await http('POST', 'api/requests/' + id + '/send', {});
+        var rq = await http('GET', 'api/requests');
+        state.requests = (rq && rq.items) || [];
+        return res;
+      }
+      var list = localRequests();
+      var req = list.filter(function (r) { return String(r.id) === String(id); })[0];
+      if (!req) throw new Error('Запрос не найден');
+      if (req.status !== 'draft') throw new Error('Отправить можно только черновик');
+      req.status = 'sent';
+      req.sent_at = new Date().toISOString();
+      req.deadline_at = isoDay(addDays(todayDate(), Number(req.deadline_days || 30)));
+      localEvent(req, 'send', 'draft', 'sent', req.method === 'email'
+        ? 'Письмо подготовлено: скопировано в буфер или открыто в почтовом клиенте'
+        : 'Отправлено вручную через форму сервиса');
+      persistRequests(list);
+      state.requests = list;
+      return {
+        ok: true, dry_run: true,
+        detail: 'Запрос отмечен отправленным. Браузерная версия не отправляет письма сама — текст копируется, отправка идёт из вашего почтового клиента.',
+        request: req
+      };
+    },
+
+    setStatus: async function (id, status, note) {
+      if (state.server) {
+        var res = await http('PATCH', 'api/requests/' + id, { status: status, note: note == null ? null : note });
+        var rq = await http('GET', 'api/requests');
+        state.requests = (rq && rq.items) || [];
+        return res;
+      }
+      var list = localRequests();
+      var req = list.filter(function (r) { return String(r.id) === String(id); })[0];
+      if (!req) throw new Error('Запрос не найден');
+      if (note != null) {
+        req.note = note;
+        localEvent(req, 'note', req.status, req.status, 'Заметка обновлена');
+      }
+      if (status && status !== req.status) {
+        if (!canTransition(req.status, status)) {
+          throw new Error('Переход «' + STATUS_LABELS[req.status] + '» → «' + STATUS_LABELS[status] + '» недоступен');
+        }
+        var from = req.status, ts = new Date().toISOString();
+        req.status = status;
+        if (status === 'sent' && !req.sent_at) {
+          req.sent_at = ts;
+          req.deadline_at = isoDay(addDays(todayDate(), Number(req.deadline_days || 30)));
+        }
+        if (status === 'responded') req.responded_at = req.responded_at || ts;
+        if (status === 'deleted') req.deleted_at = ts;
+        if (status === 'draft') { req.sent_at = null; req.responded_at = null; req.deleted_at = null; }
+        localEvent(req, status === 'draft' ? 'repeat' : 'status', from, status, note || '');
+      }
+      persistRequests(list);
+      state.requests = list;
+      return { ok: true, request: req };
+    },
+
+    deleteRequest: async function (id) {
+      if (state.server) {
+        var res = await http('DELETE', 'api/requests/' + id);
+        var rq = await http('GET', 'api/requests');
+        state.requests = (rq && rq.items) || [];
+        return res;
+      }
+      var list = localRequests().filter(function (r) { return String(r.id) !== String(id); });
+      persistRequests(list);
+      state.requests = list;
+      return { ok: true };
+    },
+
+    stats: async function () {
+      if (state.server) return await http('GET', 'api/stats');
+      return computeStats(state.requests, { profileFilled: Api.profileFilled() });
+    },
+
+    demoStats: async function () {
+      if (state.server) return await http('POST', 'api/stats/demo', {});
+      return computeStats(buildDemoRequests(), { profileFilled: true, demo: true });
+    },
+
+    wipe: async function () {
+      if (state.server) {
+        var res = await http('POST', 'api/wipe', { confirm: 'DELETE' });
+        state.requests = []; state.profile = {}; state.profileUpdated = null; state.chat = [];
+        var br = await http('GET', 'api/brokers');
+        state.brokers = (br && br.items) || [];
+        state.customBrokers = [];
+        return res;
+      }
+      Object.keys(K).forEach(function (k) { Store.del(K[k]); });
+      state.requests = []; state.profile = {}; state.profileUpdated = null;
+      state.chat = []; state.customBrokers = [];
+      state.brokers = BUILTIN_BROKERS.slice();
+      return { ok: true, detail: 'localStorage очищен: профиль, запросы, история, свои сервисы.' };
+    },
+
+    exportData: async function () {
+      if (state.server) return await http('GET', 'api/export');
+      return {
+        exported_at: new Date().toISOString(),
+        warning: 'В файле ВАШИ персональные данные в открытом виде. Храните его как конфиденциальный документ.',
+        profile: state.profile,
+        requests: state.requests
+      };
+    },
+
+    saveLlm: async function (cfg) {
+      state.llm = Object.assign({}, state.llm, cfg);
+      Store.set(K.llm, state.llm);
+      state.llmServer = { configured: !!(state.llm.base_url && state.llm.api_key && state.llm.model), local: true };
+      return { ok: true };
+    },
+
+    ask: async function (question, history) {
+      var kinds = detectPII(question);
+      if (kinds.length) return { ok: false, blocked: true, warning: piiWarning(kinds) };
+
+      if (state.server) {
+        try {
+          return await http('POST', 'api/assistant', { question: question, history: history || [] });
+        } catch (e) {
+          return { ok: false, message: e.message };
+        }
+      }
+
+      var cfg = state.llm || {};
+      if (!clean(cfg.base_url) || !clean(cfg.api_key) || !clean(cfg.model)) {
+        return {
+          ok: false, notConfigured: true,
+          hint: 'AI-помощник не настроен. Откройте «Настройки» в этом разделе и укажите Base URL, ключ и модель OpenAI-совместимого провайдера. Ключ хранится только в этом браузере.'
+        };
+      }
+      var base = clean(cfg.base_url).replace(/\/+$/, '');
+      var sys = 'Ты — консультант сервиса DataCleaner по удалению персональных данных из интернета: брокеры данных, people-search, маркетинговые базы, поисковая выдача. '
+        + 'Помогай с правами по 152-ФЗ (ст. 14, 20, 21), GDPR (Art. 15, 17, 21, 12) и CCPA/CPRA (§1798.105, §1798.130), с составлением запросов и жалоб (Роскомнадзор, надзорный орган ЕС, CPPA/Attorney General). '
+        + 'Никогда не проси у пользователя персональные данные: ФИО, email, телефон, адрес, номера документов — вместо этого объясни, что их нужно вписать самостоятельно в шаблон письма. '
+        + 'Если пользователь сам прислал ПД — не повторяй их и попроси удалить. Отвечай по-русски, кратко и структурно (нумерованные шаги, сроки, нормы), максимум 250 слов. '
+        + 'Не выдумывай точные URL и email сервисов: если не уверен, скажи, что адрес надо проверить в политике конфиденциальности сервиса. '
+        + 'Ты не юрист: в конце одной строкой напомни, что это информационная справка, а не юридическое заключение.';
+
+      var messages = [{ role: 'system', content: sys }];
+      (history || []).slice(-6).forEach(function (m) {
+        if (m && (m.role === 'user' || m.role === 'assistant') && clean(m.content) && !detectPII(m.content).length) {
+          messages.push({ role: m.role, content: String(m.content).slice(0, 2000) });
+        }
+      });
+      messages.push({ role: 'user', content: question });
+
+      var ctrl = new AbortController();
+      var timer = setTimeout(function () { ctrl.abort(); }, 70000);
+      try {
+        var resp = await fetch(base + '/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + cfg.api_key },
+          body: JSON.stringify({ model: cfg.model, messages: messages, temperature: 0.3, max_tokens: 800 }),
+          signal: ctrl.signal
+        });
+        clearTimeout(timer);
+        if (resp.status === 401) return { ok: false, message: 'Провайдер отклонил ключ (401). Проверьте ключ в настройках AI.' };
+        if (resp.status === 402) return { ok: false, message: 'На балансе провайдера закончились средства (402).' };
+        if (resp.status === 429) return { ok: false, message: 'Слишком много запросов (429). Подождите немного.' };
+        if (!resp.ok) {
+          var txt = '';
+          try {
+            var j = await resp.json();
+            txt = (j.error && (j.error.message || j.error)) || '';
+          } catch (e) { txt = ''; }
+          return {
+            ok: false,
+            message: 'Провайдер вернул ошибку ' + resp.status + '. ' + (typeof txt === 'string' ? txt.slice(0, 200) : '')
+          };
+        }
+        var data = await resp.json();
+        var answer = data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+        if (!answer) return { ok: false, message: 'Пустой ответ модели. Переформулируйте вопрос или увеличьте max_tokens.' };
+        return { ok: true, answer: String(answer).trim(), model: data.model || cfg.model, usage: data.usage || {} };
+      } catch (err) {
+        clearTimeout(timer);
+        var cors = (err && err.name === 'TypeError') || /Failed to fetch|NetworkError|Load failed/i.test(String(err && err.message));
+        return {
+          ok: false, cors: cors,
+          message: cors
+            ? 'Браузер не смог обратиться к провайдеру (CORS или сеть). Провайдер должен разрешать запросы из браузера. Если он этого не делает — используйте серверную версию DataCleaner (app/main.py): там запрос идёт с сервера и CORS не мешает.'
+            : 'Ошибка запроса: ' + (err && err.message ? err.message : 'неизвестная') + '. Проверьте Base URL и подключение к интернету.'
+        };
+      }
+    }
+  };
+
+/* ---------- 03-ui.js ---------- */
+/* ==================================================================
+   DataCleaner · 03-ui.js — рендеринг интерфейса.
+   ================================================================== */
+
+  var $ = function (sel, root) { return (root || document).querySelector(sel); };
+  var $$ = function (sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); };
+
+  var ICONS = {
+    send: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>',
+    check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>',
+    x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>',
+    reply: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M9 17l-5-5 5-5"/><path d="M4 12h9a7 7 0 0 1 7 7v2"/></svg>',
+    trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg>',
+    eye: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 12S5 5.5 12 5.5 22.5 12 22.5 12 19 18.5 12 18.5 1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3"/></svg>',
+    copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
+    link: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-2 2"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l2-2"/></svg>',
+    refresh: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>',
+    warn: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.6L2.5 17a2 2 0 0 0 1.7 3h15.6a2 2 0 0 0 1.7-3L13.7 3.6a2 2 0 0 0-3.4 0z"/></svg>',
+    info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>',
+    mail: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 7l10 6 10-6"/></svg>'
+  };
+
+  /* ----------------------------- уведомления ----------------------------- */
+  function toast(msg, type, ms) {
+    var wrap = $('#toasts');
+    var el = document.createElement('div');
+    el.className = 'toast ' + (type || 'ok');
+    var icon = (type === 'bad' || type === 'warn') ? ICONS.warn : ICONS.check;
+    el.innerHTML = icon + '<div>' + esc(msg) + '</div>';
+    wrap.appendChild(el);
+    setTimeout(function () {
+      el.classList.add('out');
+      setTimeout(function () { el.remove(); }, 280);
+    }, ms || 4200);
+  }
+
+  /* ------------------------------- модалки ------------------------------- */
+  function openModal(title, bodyHTML, buttons, onMount) {
+    $('#modal-title').textContent = title;
+    $('#modal-body').innerHTML = bodyHTML;
+    var foot = $('#modal-foot');
+    foot.innerHTML = '';
+    (buttons || []).forEach(function (b) {
+      var el = document.createElement('button');
+      el.className = 'btn ' + (b.cls || 'ghost');
+      el.innerHTML = (b.icon ? ICONS[b.icon] : '') + '<span>' + esc(b.label) + '</span>';
+      el.addEventListener('click', function () { if (b.onClick) b.onClick(el); });
+      foot.appendChild(el);
+    });
+    $('#modal').classList.add('open');
+    if (onMount) onMount();
+  }
+  function closeModal() {
+    $('#modal').classList.remove('open');
+  }
+
+  function statusPill(status) {
+    return '<span class="pill ' + (STATUS_CLASS[status] || 'neutral') + '">' + esc(STATUS_LABELS[status] || status) + '</span>';
+  }
+
+  function navigate(view) {
+    state.view = view;
+    $$('.view').forEach(function (v) { v.classList.toggle('active', v.id === 'view-' + view); });
+    $$('#nav button').forEach(function (b) { b.classList.toggle('active', b.dataset.view === view); });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (view === 'dashboard') renderDashboard();
+    if (view === 'profile') renderProfile();
+    if (view === 'catalog') renderCatalog();
+    if (view === 'requests') renderRequests();
+    if (view === 'ai') renderAI();
+    if (view === 'data') renderData();
+  }
+
+  /* -------------------------------- ОБЗОР -------------------------------- */
+  async function renderDashboard() {
+    var stats = state.demo;
+    if (!stats) {
+      try { stats = await Api.stats(); }
+      catch (e) { toast('Не удалось получить статистику: ' + e.message, 'bad'); return; }
+    }
+    paintDashboard(stats);
+  }
+
+  function barRow(label, value, percent, cls, overridePercent) {
+    var pct = overridePercent != null ? overridePercent : (percent == null ? 0 : percent);
+    pct = Math.max(0, Math.min(100, pct));
+    return '<div class="bar-row"><div class="bar-head"><span>' + esc(label) + '</span><b>' + esc(String(value)) +
+      (percent != null ? ' · ' + percent + '%' : '') + '</b></div>' +
+      '<div class="bar-track"><div class="bar-fill ' + (cls || '') + '" style="width:' + pct + '%"></div></div></div>';
+  }
+
+  function paintDashboard(stats) {
+    var k = stats.kpi;
+
+    $('#kpi-sent').textContent = k.sent;
+    $('#kpi-sent-hint').textContent = k.total
+      ? 'из ' + k.total + ' ' + plural(k.total, 'запроса', 'запросов', 'запросов') + ' создано'
+      : 'писем и обращений';
+    $('#kpi-waiting').textContent = k.waiting;
+    $('#kpi-waiting-hint').textContent = k.waiting ? 'в пределах 30 дней' : 'нет активных ожиданий';
+    $('#kpi-overdue').textContent = k.overdue;
+    $('#kpi-overdue-hint').textContent = k.overdue
+      ? ('макс. просрочка ' + k.oldest_overdue_days + ' ' + plural(k.oldest_overdue_days, 'день', 'дня', 'дней'))
+      : 'сроки соблюдаются';
+    $('#kpi-deleted').textContent = k.deleted;
+    $('#kpi-deleted-hint').textContent = k.deleted ? 'подтверждено сервисами' : 'пока нет подтверждений';
+
+    var rate = Number(k.deletion_rate) || 0;
+    $('#ring').style.setProperty('--p', rate);
+    $('#ring-num').textContent = (rate % 1 === 0 ? rate.toFixed(0) : rate.toFixed(1)) + '%';
+    $('#lg-deleted').textContent = k.deleted;
+    $('#lg-responded').textContent = k.responded;
+    $('#lg-refused').textContent = k.refused;
+    $('#lg-drafts').textContent = k.drafts;
+
+    $('#avg-days').textContent = k.avg_response_days == null ? '—' : String(k.avg_response_days).replace('.', ',');
+    $('#avg-note').textContent = k.avg_response_days == null
+      ? 'Пока нет ответов от сервисов — среднее появится после первого ответа.'
+      : 'Считается по ' + (k.responded + k.deleted) + ' ' + plural(k.responded + k.deleted, 'ответу', 'ответам', 'ответам') + ' сервисов.';
+
+    var base = Math.max(k.sent, 1);
+    $('#rate-bars').innerHTML = [
+      barRow('Удалено', k.deleted, Math.round(k.deleted / base * 100), 'c3'),
+      barRow('Ответили, но не удалили', k.responded, Math.round(k.responded / base * 100), 'c4'),
+      barRow('Отказ', k.refused, Math.round(k.refused / base * 100), 'c5'),
+      barRow('Доля сервисов, ответивших на запрос', k.response_rate + '%', null, 'c2', Number(k.response_rate) || 0)
+    ].join('');
+
+    $('#funnel').innerHTML = stats.funnel.map(function (f, i) {
+      var cls = ['c5', 'c2', 'c4', 'c3'][i] || 'c2';
+      return barRow(f.label, f.count, f.percent, cls);
+    }).join('');
+
+    var maxDay = Math.max.apply(null, stats.activity.map(function (a) { return a.count; }).concat([1]));
+    /* высота столбца считается от реальной высоты области графика (телефон/ПК) */
+    var chartEl = $('#chart');
+    var maxBarPx = Math.max(60, (chartEl.clientHeight || 168) - 30);
+    var narrow = window.innerWidth < 560;
+    chartEl.innerHTML = stats.activity.map(function (a, idx) {
+      var h = a.count ? Math.max(10, Math.round(a.count / maxDay * maxBarPx)) : 4;
+      var d = parseDay(a.date);
+      var label = (d && (!narrow || idx % 2 === 1))
+        ? String(d.getDate()).padStart(2, '0') + '.' + String(d.getMonth() + 1).padStart(2, '0')
+        : '';
+      return '<div class="col" title="' + esc(a.date) + ': ' + a.count + '">' +
+        '<div class="bar ' + (a.count ? '' : 'zero') + '" style="height:' + h + 'px"><span>' + a.count + '</span></div>' +
+        '<div class="cl">' + esc(label) + '</div></div>';
+    }).join('');
+
+    $('#categories').innerHTML = stats.by_category.length
+      ? stats.by_category.map(function (c, i) {
+        return barRow(c.label, c.count, c.percent, ['c2', 'c3', 'c4', 'c5'][i % 4]);
+      }).join('')
+      : '<div class="tiny">Пока нет отправленных запросов — разбивка появится после первой отправки.</div>';
+
+    $('#deadlines').innerHTML = stats.deadlines.length
+      ? stats.deadlines.map(function (d) {
+        var cls = d.days_left < 0 ? 'bad' : (d.days_left <= 7 ? 'warn' : 'ok');
+        var label = d.days_left < 0
+          ? ('просрочено на ' + Math.abs(d.days_left) + ' ' + plural(Math.abs(d.days_left), 'день', 'дня', 'дней'))
+          : ('осталось ' + d.days_left + ' ' + plural(d.days_left, 'день', 'дня', 'дней'));
+        return '<div class="dl"><span class="nm">' + esc(d.broker) + '</span>' +
+          '<span class="pill ' + cls + '">' + esc(label) + '</span>' +
+          '<span class="dt">до ' + esc(fmtDate(d.deadline)) + '</span></div>';
+      }).join('')
+      : '<div class="tiny">Активных дедлайнов нет: отправьте первый запрос, и здесь появится таймер 30 дней.</div>';
+
+    $('#tips').innerHTML = stats.tips.map(function (t) {
+      var warn = /Просрочено|Отказов/.test(t);
+      return '<div class="tip' + (warn ? ' warn' : '') + '">' + (warn ? ICONS.warn : ICONS.info) +
+        '<div>' + esc(t) + '</div></div>';
+    }).join('');
+
+    $('#privacy-note').textContent = stats.note || '';
+
+    var banner = $('#demo-banner');
+    if (stats.demo) {
+      banner.innerHTML = '<div class="banner">' + ICONS.warn +
+        '<div><b>Демо-режим.</b> Показаны синтетические данные для проверки интерфейса — они не сохранены. ' +
+        '<button class="btn sm" id="btn-demo-off" style="margin-left:8px">Вернуться к моим данным</button></div></div>';
+      var off = $('#btn-demo-off');
+      if (off) off.addEventListener('click', function () { state.demo = null; renderDashboard(); });
+    } else {
+      banner.innerHTML = '';
+    }
+  }
+
+  /* ------------------------------- ПРОФИЛЬ ------------------------------- */
+  function renderProfile() {
+    var p = state.profile || {};
+    $('#pf-name').value = p.full_name || '';
+    $('#pf-emails').value = listOf(p.emails).join(', ');
+    $('#pf-phones').value = listOf(p.phones).join(', ');
+    $('#pf-city').value = p.city || '';
+    $('#pf-birth').value = p.birth_year || '';
+    $('#pf-address').value = p.address || '';
+    $('#pf-lang').value = p.language || 'ru';
+    $('#profile-saved-at').textContent = state.profileUpdated
+      ? 'сохранено ' + fmtDateTime(state.profileUpdated)
+      : 'ещё не сохранено';
+    $('#storage-note').textContent = state.server
+      ? 'Серверный режим: профиль хранится в SQLite в зашифрованном виде (Fernet: AES-128-CBC + HMAC-SHA256), ключ — в переменной окружения DATA_KEY.'
+      : (storageOK
+        ? 'Браузерный режим: данные лежат только в localStorage этого устройства и никуда не передаются. Полей, которые не заполнены, в письме просто не будет.'
+        : 'Внимание: localStorage недоступен (приватный режим или песочница iframe). Данные живут только в памяти вкладки и исчезнут после перезагрузки.');
+    renderProfilePreview(p);
+  }
+
+  function renderProfilePreview(p) {
+    p = p || {};
+    var rows = piiRows(p, 'ru');
+    var emails = listOf(p.emails);
+    var lines = [];
+    lines.push('Кому: <Название сервиса>');
+    lines.push('От: ' + (clean(p.full_name) || 'субъекта персональных данных') + (emails[0] ? ', ' + emails[0] : ''));
+    lines.push('Дата: ' + ruDate(todayDate()));
+    lines.push('');
+    if (rows.length) {
+      lines.push('В вашем сервисе обрабатываются следующие мои персональные данные:');
+      lines.push('');
+      rows.forEach(function (r) { lines.push('  • ' + r); });
+    } else {
+      lines.push('(Блок с персональными данными пуст — заполните профиль, иначе оператор не сможет вас идентифицировать.)');
+    }
+    $('#profile-preview').textContent = lines.join('\n');
+  }
+
+  /* ------------------------------- КАТАЛОГ ------------------------------- */
+  function renderCatalog() {
+    var list = state.brokers.filter(function (b) {
+      if (state.filterCat === 'all') return true;
+      if (state.filterCat === 'custom') return !!b.custom;
+      return b.category === state.filterCat;
+    });
+    var root = $('#broker-list');
+    if (!list.length) {
+      root.innerHTML = '<div class="empty"><strong>В этой категории пусто</strong>Добавьте свой сервис кнопкой «Свой сервис».</div>';
+      return;
+    }
+    root.innerHTML = list.map(function (b) {
+      var linked = state.requests.filter(function (r) { return r.broker_id === b.id; })[0];
+      return '<article class="broker">' +
+        '<div class="b-top"><div class="b-name">' + esc(b.name) + '</div>' +
+        '<span class="pill neutral">' + esc(b.language === 'en' ? 'EN' : 'RU') + '</span></div>' +
+        '<div class="b-cat">' + esc(CATEGORY_LABELS[b.category] || b.category) + ' · ' +
+        esc(METHOD_LABELS[b.method] || b.method) + (b.custom ? ' · свой' : '') + '</div>' +
+        '<div class="b-notes">' + esc(b.notes || '') + '</div>' +
+        '<div class="b-meta">' +
+        (b.verify ? '<span class="verify">' + ICONS.warn + 'проверить перед использованием</span>' : '') +
+        (b.email ? '<span class="pill neutral">' + esc(b.email) + '</span>' : '') +
+        (b.deadline_days ? '<span class="pill neutral">' + b.deadline_days + ' дней</span>' : '') +
+        '</div>' +
+        '<div class="b-actions">' +
+        (linked
+          ? '<button class="btn sm" data-act="goto-request" data-req="' + linked.id + '">' + ICONS.eye + 'Открыть запрос</button>'
+          : '<button class="btn sm primary" data-act="create" data-broker="' + esc(b.id) + '">' + ICONS.mail + 'Создать запрос</button>') +
+        (b.url ? '<a class="btn sm" href="' + esc(b.url) + '" target="_blank" rel="noopener noreferrer">' + ICONS.link + 'Открыть сайт</a>' : '') +
+        (b.custom ? '<button class="btn sm danger" data-act="del-broker" data-broker="' + esc(b.id) + '">' + ICONS.trash + 'Удалить</button>' : '') +
+        '</div></article>';
+    }).join('');
+  }
+
+  /* ------------------------------- ЗАПРОСЫ ------------------------------- */
+  function renderRequests() {
+    var list = state.requests.filter(function (r) {
+      return state.filterStatus === 'all' || r.status === state.filterStatus;
+    });
+    var root = $('#request-list');
+    if (!list.length) {
+      root.innerHTML = '<div class="empty"><strong>Запросов пока нет</strong>Выберите сервис в «Каталоге» — письмо соберётся автоматически с вашими данными.</div>';
+      return;
+    }
+    root.innerHTML = list.map(function (r) {
+      var dl = parseDay(r.deadline_at);
+      var daysLeft = dl ? daysBetween(todayDate(), dl) : null;
+      var dlPill = (r.status === 'sent' && daysLeft != null)
+        ? '<span class="pill ' + (daysLeft < 0 ? 'bad' : (daysLeft <= 7 ? 'warn' : 'ok')) + '">' +
+        (daysLeft < 0 ? 'просрочено на ' + Math.abs(daysLeft) + ' дн.' : 'осталось ' + daysLeft + ' дн.') + '</span>'
+        : '';
+
+      var actions = [];
+      if (r.status === 'draft') actions.push('<button class="btn sm primary" data-act="send" data-id="' + r.id + '">' + ICONS.send + 'Отправить</button>');
+      if (r.status === 'sent') actions.push('<button class="btn sm" data-act="status" data-status="responded" data-id="' + r.id + '">' + ICONS.reply + 'Ответили</button>');
+      if (r.status === 'sent' || r.status === 'responded') actions.push('<button class="btn sm ok" data-act="status" data-status="deleted" data-id="' + r.id + '">' + ICONS.check + 'Удалено</button>');
+      if (r.status === 'sent' || r.status === 'responded') actions.push('<button class="btn sm danger" data-act="status" data-status="refused" data-id="' + r.id + '">' + ICONS.x + 'Отказ</button>');
+      if (r.status === 'refused') actions.push('<button class="btn sm ok" data-act="status" data-status="deleted" data-id="' + r.id + '">' + ICONS.check + 'Всё же удалили</button>');
+      if (r.status !== 'draft') actions.push('<button class="btn sm" data-act="status" data-status="draft" data-id="' + r.id + '">' + ICONS.refresh + 'Повторить</button>');
+      actions.push('<button class="btn sm" data-act="view" data-id="' + r.id + '">' + ICONS.eye + 'Письмо</button>');
+      actions.push('<button class="btn sm ghost" data-act="note" data-id="' + r.id + '">Заметка</button>');
+      actions.push('<button class="btn sm danger" data-act="del" data-id="' + r.id + '" title="Удалить запрос">' + ICONS.trash + '</button>');
+
+      return '<article class="req">' +
+        '<div class="req-head"><div class="req-name">' + esc(r.broker_name) + '</div>' +
+        statusPill(r.status) + dlPill + '</div>' +
+        '<div class="req-meta">' +
+        '<span>' + esc(CATEGORY_LABELS[r.broker_category] || '—') + '</span>' +
+        '<span>' + esc(METHOD_LABELS[r.method] || r.method) + '</span>' +
+        (r.to_email ? '<span>' + esc(r.to_email) + '</span>' : '') +
+        '<span>создан ' + esc(fmtDate(r.created_at)) + '</span>' +
+        (r.sent_at ? '<span>отправлен ' + esc(fmtDate(r.sent_at)) + '</span>' : '') +
+        (r.responded_at ? '<span>ответ ' + esc(fmtDate(r.responded_at)) + '</span>' : '') +
+        '<span>' + esc(r.language === 'en' ? 'English' : 'Русский') + '</span>' +
+        '</div>' +
+        (r.note ? '<div class="tiny">Заметка: ' + esc(r.note) + '</div>' : '') +
+        (r.error ? '<div class="tiny" style="color:#fda4af">' + esc(r.error) + '</div>' : '') +
+        '<div class="req-actions">' + actions.join('') + '</div>' +
+        '</article>';
+    }).join('');
+  }
+
+  /* --------------------------------- AI --------------------------------- */
+  function renderAI() {
+    var configured = state.server
+      ? !!(state.llmServer && state.llmServer.configured)
+      : !!(state.llm.base_url && state.llm.api_key && state.llm.model);
+    var text;
+    if (state.server) {
+      text = configured
+        ? 'Серверный режим: AI подключён через сервер (модель ' + esc(state.llmServer.model || '—') +
+        ', провайдер ' + esc(state.llmServer.base_url_host || '—') + '). Ключ хранится в переменной окружения LLM_API_KEY и в браузер не попадает.'
+        : 'AI на сервере не настроен. Задайте LLM_API_KEY, LLM_BASE_URL, LLM_MODEL в .env и перезапустите сервер. Всё остальное работает и без AI.';
+    } else {
+      text = configured
+        ? 'Браузерный режим: запрос идёт напрямую из браузера на ' + esc(state.llm.base_url) +
+        ' (модель ' + esc(state.llm.model) + '). Ключ хранится только в localStorage этого устройства.'
+        : 'AI-помощник не настроен. Нажмите «Настройки» и укажите Base URL, ключ и модель OpenAI-совместимого провайдера. Без AI всё остальное работает.';
+    }
+    $('#ai-status-text').innerHTML = text;
+
+    var chat = $('#chat');
+    if (!state.chat.length) {
+      chat.innerHTML = '<div class="msg bot"><div class="av">AI</div><div class="bubble">Здравствуйте! Помогу разобраться с удалением данных: 152-ФЗ, GDPR, CCPA, жалобы регуляторам, тексты запросов. Я не спрашиваю и не сохраняю ваши персональные данные — ФИО, email и телефоны подставляются в письма локально, в разделе «Запросы».</div></div>';
+    } else {
+      chat.innerHTML = state.chat.map(function (m) {
+        var cls = m.role === 'user' ? 'user' : (m.role === 'system' ? 'sys' : 'bot');
+        var av = m.role === 'user' ? 'Вы' : (m.role === 'system' ? '!' : 'AI');
+        return '<div class="msg ' + cls + '"><div class="av">' + av + '</div><div class="bubble">' + esc(m.content) + '</div></div>';
+      }).join('');
+      chat.scrollTop = chat.scrollHeight;
+    }
+  }
+
+  async function sendChat() {
+    var input = $('#chat-input');
+    var q = clean(input.value);
+    if (!q || state.busy) return;
+    var kinds = detectPII(q);
+    if (kinds.length) {
+      state.chat.push({ role: 'user', content: q });
+      state.chat.push({ role: 'system', content: piiWarning(kinds) });
+      Store.set(K.chat, state.chat);
+      input.value = '';
+      renderAI();
+      toast('Запрос заблокирован: в вопросе есть персональные данные', 'warn', 6000);
+      return;
+    }
+    state.chat.push({ role: 'user', content: q });
+    input.value = '';
+    renderAI();
+    state.busy = true;
+    var btn = $('#btn-ai-send');
+    btn.disabled = true;
+    var span = btn.querySelector('span');
+    if (span) span.textContent = 'Думаю…';
+    try {
+      var history = state.chat.filter(function (m) { return m.role !== 'system'; }).slice(0, -1);
+      var res = await Api.ask(q, history);
+      if (res.blocked) state.chat.push({ role: 'system', content: res.warning });
+      else if (res.notConfigured) state.chat.push({ role: 'system', content: res.hint });
+      else if (!res.ok) state.chat.push({ role: 'system', content: (res.cors ? 'CORS: ' : 'Ошибка: ') + (res.message || res.detail || 'не удалось получить ответ') });
+      else state.chat.push({ role: 'assistant', content: res.answer });
+    } catch (e) {
+      state.chat.push({ role: 'system', content: 'Ошибка: ' + e.message });
+    } finally {
+      state.busy = false;
+      btn.disabled = false;
+      if (span) span.textContent = 'Спросить';
+      Store.set(K.chat, state.chat);
+      renderAI();
+    }
+  }
+
+  /* -------------------------------- ДАННЫЕ -------------------------------- */
+  function renderData() {
+    var rows = state.server
+      ? [
+        ['Режим', 'серверный (FastAPI + SQLite)'],
+        ['Шифрование ПД', 'Fernet, ключ из DATA_KEY'],
+        ['Отправка писем', state.serverMeta.dry_run ? 'DRY_RUN=1 (письма не уходят)' : 'реальная отправка через SMTP'],
+        ['SMTP', state.serverMeta.smtp_configured ? 'настроен' : 'не настроен'],
+        ['AI', state.serverMeta.llm_configured ? 'подключён' : 'не настроен'],
+        ['Запросов в базе', String(state.requests.length)]
+      ]
+      : [
+        ['Режим', 'браузерный (без сервера)'],
+        ['Хранилище', storageOK ? 'localStorage этого устройства' : 'только память вкладки (localStorage недоступен)'],
+        ['Шифрование', 'нет: данные лежат локально и не передаются по сети'],
+        ['Отправка писем', 'вручную: копирование текста или mailto'],
+        ['AI', (state.llm.base_url && state.llm.api_key) ? 'подключён из браузера' : 'не настроен'],
+        ['Запросов', String(state.requests.length)]
+      ];
+    $('#storage-kv').innerHTML = rows.map(function (r) {
+      return '<dt>' + esc(r[0]) + '</dt><dd>' + esc(r[1]) + '</dd>';
+    }).join('');
+    $('#wipe-note').textContent = state.server
+      ? 'Будут удалены таблицы profile, requests, events, custom_brokers в SQLite. Отменить нельзя.'
+      : 'Будет очищен localStorage этого домена: профиль, запросы, история, свои сервисы и история AI-чата. Отменить нельзя.';
+  }
+
+/* ---------- 04-actions.js ---------- */
+/* ==================================================================
+   DataCleaner · 04-actions.js — действия, модальные сценарии,
+   «Самопроверка», привязка событий и запуск приложения.
+   ================================================================== */
+
+  async function copyText(text) {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch (e) { /* переходим к запасному способу */ }
+    try {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      var ok = document.execCommand('copy');
+      ta.remove();
+      return ok;
+    } catch (e) { return false; }
+  }
+
+  function letterText(subject, body) {
+    return 'Тема: ' + subject + '\n\n' + body;
+  }
+
+  /* ---------------------------- новый запрос ---------------------------- */
+  function openNewRequestModal() {
+    var options = state.brokers.map(function (b) {
+      return '<option value="' + esc(b.id) + '">' + esc(b.name) + ' · ' +
+        esc(CATEGORY_LABELS[b.category] || b.category) + (b.custom ? ' · свой' : '') + '</option>';
+    }).join('');
+    var html = '<div class="field"><label for="nr-broker">Сервис</label><select id="nr-broker">' + options + '</select></div>' +
+      '<div class="field"><label for="nr-lang">Язык письма</label><select id="nr-lang">' +
+      '<option value="">Автоматически (по языку сервиса)</option>' +
+      '<option value="ru">Русский — ст. 14 и 21 152-ФЗ, срок 30 дней</option>' +
+      '<option value="en">English — GDPR Art. 17 и CCPA</option></select></div>' +
+      '<p class="tiny">Письмо собирается локально из вашего профиля. Пустые поля в текст не попадают.</p>';
+    openModal('Новый запрос', html, [
+      { label: 'Отмена', cls: 'ghost', onClick: closeModal },
+      {
+        label: 'Создать письмо', cls: 'primary', icon: 'mail', onClick: async function (btn) {
+          btn.disabled = true;
+          try {
+            var brokerId = $('#nr-broker').value;
+            var lang = $('#nr-lang').value || null;
+            var res = await Api.createRequest(brokerId, lang);
+            closeModal();
+            await refreshAll();
+            toast('Письмо создано и сохранено как черновик');
+            var full = await Api.getRequestFull(res.request.id);
+            openLetterModal(full.request, full.letter, full.events || []);
+          } catch (e) {
+            toast('Не удалось создать запрос: ' + e.message, 'bad', 6000);
+          } finally { btn.disabled = false; }
+        }
+      }
+    ]);
+  }
+
+  /* ------------------------------ письмо ------------------------------ */
+  function openLetterModal(req, letter, events) {
+    var broker = state.brokers.filter(function (b) { return b.id === req.broker_id; })[0] || {};
+    var html = '<div class="inline" style="margin-bottom:12px">' + statusPill(req.status) +
+      '<span class="pill neutral">' + esc(letter.language === 'en' ? 'English / GDPR' : 'Русский / 152-ФЗ') + '</span>' +
+      (req.to_email ? '<span class="pill neutral">' + esc(req.to_email) + '</span>' : '') +
+      (req.deadline_at ? '<span class="pill neutral">дедлайн ' + esc(fmtDate(req.deadline_at)) + '</span>' : '') +
+      '</div>' +
+      '<div class="field"><label>Тема письма</label><div class="letter" style="max-height:none">' + esc(letter.subject) + '</div></div>' +
+      '<div class="field"><label>Текст письма</label><pre class="letter" id="letter-body">' + esc(letter.body) + '</pre></div>' +
+      (broker.url ? '<p class="tiny">Ссылка сервиса: <a href="' + esc(broker.url) + '" target="_blank" rel="noopener noreferrer">' +
+        esc(broker.url) + '</a> — проверьте актуальность перед отправкой.</p>' : '') +
+      '<p class="tiny">Письмо отправляется как обычный текст: без трекинг-пикселей и внешних картинок. «Прочитано» не отслеживается.</p>' +
+      ((events && events.length)
+        ? '<div class="hr"></div><h3 style="font-size:13px;margin:0 0 6px">История изменений</h3><div class="timeline">' +
+        events.map(function (e) {
+          var cls = e.to_status === 'deleted' ? 'ok' : (e.to_status === 'refused' ? 'bad' : '');
+          var label = e.type === 'created' ? 'Создан'
+            : (e.type === 'send' ? 'Отправлен'
+              : (e.type === 'send_failed' ? 'Ошибка отправки'
+                : (e.type === 'repeat' ? 'Возвращён в черновик'
+                  : (STATUS_LABELS[e.to_status] || e.type))));
+          return '<div class="tl-item ' + cls + '">' + esc(label) +
+            (e.note ? ' — ' + esc(e.note) : '') +
+            '<span class="t-when">' + esc(fmtDateTime(e.at || e.created_at)) + '</span></div>';
+        }).join('') + '</div>'
+        : '');
+
+    var buttons = [
+      {
+        label: 'Скопировать письмо', cls: 'primary', icon: 'copy', onClick: async function () {
+          var ok = await copyText(letterText(letter.subject, letter.body));
+          toast(ok ? 'Письмо скопировано в буфер' : 'Не удалось скопировать — выделите текст вручную', ok ? 'ok' : 'warn');
+        }
+      }
+    ];
+    if (req.method === 'email' && req.to_email) {
+      buttons.push({
+        label: 'Открыть в почте', cls: 'ghost', icon: 'mail', onClick: function () {
+          location.href = 'mailto:' + encodeURIComponent(req.to_email) +
+            '?subject=' + encodeURIComponent(letter.subject) +
+            '&body=' + encodeURIComponent(letter.body);
+        }
+      });
+    }
+    if (broker.url) {
+      buttons.push({
+        label: 'Открыть форму', cls: 'ghost', icon: 'link', onClick: function () {
+          window.open(broker.url, '_blank', 'noopener');
+        }
+      });
+    }
+    if (req.status === 'draft') {
+      buttons.push({
+        label: 'Отметить отправленным', cls: 'ok', icon: 'send', onClick: async function (btn) {
+          btn.disabled = true;
+          try {
+            var res = await Api.send(req.id);
+            closeModal();
+            await refreshAll();
+            toast(res.detail || 'Запрос отмечен отправленным', res.ok === false ? 'bad' : 'ok', 7000);
+          } catch (e) {
+            toast('Ошибка отправки: ' + e.message, 'bad', 7000);
+          } finally { btn.disabled = false; }
+        }
+      });
+    }
+    openModal('Письмо · ' + req.broker_name, html, buttons);
+  }
+
+  /* ------------------------------ заметка ------------------------------ */
+  function openNoteModal(req) {
+    var html = '<div class="field"><label for="note-input">Заметка к запросу</label>' +
+      '<textarea id="note-input" placeholder="Например: номер обращения с сайта, имя оператора, что ответили">' +
+      esc(req.note || '') + '</textarea>' +
+      '<div class="help">Заметки хранятся вместе с историей запроса.</div></div>';
+    openModal('Заметка · ' + req.broker_name, html, [
+      { label: 'Отмена', cls: 'ghost', onClick: closeModal },
+      {
+        label: 'Сохранить', cls: 'primary', icon: 'check', onClick: async function (btn) {
+          btn.disabled = true;
+          try {
+            await Api.setStatus(req.id, null, $('#note-input').value);
+            closeModal();
+            await refreshAll();
+            toast('Заметка сохранена');
+          } catch (e) {
+            toast('Ошибка: ' + e.message, 'bad');
+          } finally { btn.disabled = false; }
+        }
+      }
+    ]);
+  }
+
+  /* ---------------------------- свой сервис ---------------------------- */
+  function openAddBrokerModal() {
+    var html = '<div class="row"><div class="field"><label for="ab-name">Название сервиса</label>' +
+      '<input id="ab-name" type="text" placeholder="Например: БКИ «Пример»"></div>' +
+      '<div class="field"><label for="ab-cat">Категория</label><select id="ab-cat">' +
+      ['people_search', 'data_broker', 'marketing', 'search', 'custom'].map(function (c) {
+        return '<option value="' + c + '">' + esc(CATEGORY_LABELS[c]) + '</option>';
+      }).join('') + '</select></div></div>' +
+      '<div class="row"><div class="field"><label for="ab-method">Способ обращения</label><select id="ab-method">' +
+      '<option value="email">email</option><option value="form">форма на сайте</option><option value="manual">вручную</option></select></div>' +
+      '<div class="field"><label for="ab-lang">Язык письма</label><select id="ab-lang">' +
+      '<option value="ru">Русский (152-ФЗ)</option><option value="en">English (GDPR/CCPA)</option></select></div></div>' +
+      '<div class="row"><div class="field"><label for="ab-email">Email для запросов</label>' +
+      '<input id="ab-email" type="text" placeholder="privacy@example.ru"></div>' +
+      '<div class="field"><label for="ab-url">URL формы / сайта</label>' +
+      '<input id="ab-url" type="text" placeholder="https://example.ru/privacy"></div></div>' +
+      '<div class="field"><label for="ab-deadline">Срок ответа, дней</label>' +
+      '<input id="ab-deadline" type="text" inputmode="numeric" value="30"></div>' +
+      '<div class="field"><label for="ab-notes">Заметки</label>' +
+      '<textarea id="ab-notes" placeholder="Где взял адрес, что нужно подтвердить"></textarea></div>';
+    openModal('Свой сервис', html, [
+      { label: 'Отмена', cls: 'ghost', onClick: closeModal },
+      {
+        label: 'Добавить', cls: 'primary', icon: 'check', onClick: async function (btn) {
+          var name = clean($('#ab-name').value);
+          if (!name) { toast('Укажите название', 'warn'); return; }
+          var method = $('#ab-method').value;
+          var email = clean($('#ab-email').value);
+          var url = clean($('#ab-url').value);
+          if (method === 'email' && !email) { toast('Для способа «email» нужен адрес', 'warn'); return; }
+          if (method === 'form' && !url) { toast('Для способа «форма» нужен URL', 'warn'); return; }
+          btn.disabled = true;
+          try {
+            await Api.addBroker({
+              id: 'custom-' + Date.now(), name: name, category: $('#ab-cat').value, method: method,
+              email: email, url: url, language: $('#ab-lang').value,
+              notes: clean($('#ab-notes').value), deadline_days: Number($('#ab-deadline').value) || 30
+            });
+            closeModal();
+            renderCatalog();
+            toast('Сервис добавлен в каталог');
+          } catch (e) {
+            toast('Ошибка: ' + e.message, 'bad');
+          } finally { btn.disabled = false; }
+        }
+      }
+    ]);
+  }
+
+  /* --------------------------- настройки AI --------------------------- */
+  function openAiSettingsModal() {
+    if (state.server) {
+      openModal('Настройки AI',
+        '<p class="tiny">В серверном режиме ключ задаётся только переменными окружения на сервере — в браузер он не попадает.</p>' +
+        '<div class="letter" style="max-height:none">LLM_API_KEY=&lt;ключ провайдера&gt;\nLLM_BASE_URL=' +
+        esc(state.llmServer.base_url_host ? 'https://' + state.llmServer.base_url_host + '/v1' : 'https://tokenlavka.com/v1') +
+        '\nLLM_MODEL=' + esc(state.llmServer.model || 'gpt-6-luna') + '</div>' +
+        '<p class="tiny">После правки .env перезапустите uvicorn. Ключ из браузера не используется вообще.</p>',
+        [{ label: 'Понятно', cls: 'primary', onClick: closeModal }]);
+      return;
+    }
+    var cfg = state.llm || {};
+    var html = '<div class="banner">' + ICONS.warn +
+      '<div>Ключ хранится в localStorage этого браузера и уходит напрямую провайдеру. На чужом устройстве не сохраняйте ключ. Для продукта используйте серверный режим: там ключ не покидает сервер.</div></div>' +
+      '<div class="field"><label for="llm-base">Base URL</label>' +
+      '<input id="llm-base" type="text" placeholder="https://tokenlavka.com/v1" value="' + esc(cfg.base_url || '') + '">' +
+      '<div class="help">OpenAI-совместимый адрес. Запрос уйдёт на {Base URL}/chat/completions.</div></div>' +
+      '<div class="field"><label for="llm-key">API-ключ</label>' +
+      '<input id="llm-key" type="password" placeholder="sk-..." value="' + esc(cfg.api_key || '') + '"></div>' +
+      '<div class="field"><label for="llm-model">Модель</label>' +
+      '<input id="llm-model" type="text" placeholder="gpt-6-luna" value="' + esc(cfg.model || '') + '">' +
+      '<div class="help">Точный ID модели из документации провайдера.</div></div>';
+    openModal('Настройки AI', html, [
+      { label: 'Отмена', cls: 'ghost', onClick: closeModal },
+      {
+        label: 'Сохранить', cls: 'primary', icon: 'check', onClick: async function () {
+          await Api.saveLlm({
+            base_url: clean($('#llm-base').value),
+            api_key: clean($('#llm-key').value),
+            model: clean($('#llm-model').value)
+          });
+          closeModal();
+          renderAI();
+          toast('Настройки AI сохранены');
+        }
+      }
+    ]);
+  }
+
+  /* ---------------------------- полная очистка ---------------------------- */
+  function openWipeModal() {
+    var html = '<div class="banner">' + ICONS.warn +
+      '<div>Это необратимо: ' +
+      (state.server
+        ? 'будут удалены профиль, все запросы, история изменений и ваши сервисы в базе SQLite.'
+        : 'будет очищен localStorage: профиль, запросы, история, свои сервисы и история чата.') +
+      '</div></div>' +
+      '<div class="field"><label for="wipe-confirm">Введите DELETE, чтобы подтвердить</label>' +
+      '<input id="wipe-confirm" type="text" placeholder="DELETE" autocomplete="off"></div>';
+    openModal('Удалить все данные?', html, [
+      { label: 'Отмена', cls: 'ghost', onClick: closeModal },
+      {
+        label: 'Удалить всё', cls: 'danger', icon: 'trash', onClick: async function (btn) {
+          if (clean($('#wipe-confirm').value).toUpperCase() !== 'DELETE') {
+            toast('Введите DELETE для подтверждения', 'warn');
+            return;
+          }
+          btn.disabled = true;
+          try {
+            var res = await Api.wipe();
+            closeModal();
+            await refreshAll();
+            renderProfile();
+            renderAI();
+            toast(res.detail || 'Все данные удалены');
+          } catch (e) {
+            toast('Ошибка: ' + e.message, 'bad');
+          } finally { btn.disabled = false; }
+        }
+      }
+    ]);
+  }
+
+  /* ============================= САМОПРОВЕРКА ============================= */
+  function selfTest() {
+    var results = [];
+    function check(name, fn) {
+      try {
+        var out = fn();
+        if (out === true) results.push({ name: name, pass: true, detail: 'ok' });
+        else results.push({ name: name, pass: false, detail: typeof out === 'string' ? out : 'проверка не пройдена' });
+      } catch (e) {
+        results.push({ name: name, pass: false, detail: 'исключение: ' + e.message });
+      }
+    }
+
+    var fullProfile = {
+      full_name: 'Иван Иванов', emails: ['ivan@example.com'], phones: ['+7 900 000-00-00'],
+      city: 'Петрозаводск', birth_year: '1990', address: 'ул. Ленина, 1', language: 'ru'
+    };
+    var emptyProfile = { full_name: '', emails: [], phones: [], city: '', birth_year: '', address: '', language: 'ru' };
+    var ruBroker = { id: 'ru', name: 'ООО «Пример»', category: 'data_broker', method: 'email', email: 'privacy@example.ru', language: 'ru', deadline_days: 30 };
+    var enBroker = { id: 'en', name: 'Spokeo', category: 'people_search', method: 'form', url: 'https://example.com', email: '', language: 'en', deadline_days: 45 };
+
+    check('RU-письмо ссылается на ст. 14 и ст. 21 152-ФЗ', function () {
+      var l = buildRuLetter(fullProfile, ruBroker);
+      if (l.body.indexOf('статьи 14') === -1) return 'нет ссылки на ст. 14';
+      if (l.body.indexOf('статьи 21') === -1) return 'нет ссылки на ст. 21';
+      return true;
+    });
+
+    check('RU-письмо содержит срок 30 дней', function () {
+      return buildRuLetter(fullProfile, ruBroker).body.indexOf('30 дней') !== -1 ? true : 'срок 30 дней не найден';
+    });
+
+    check('EN-письмо ссылается на Art. 17 GDPR и CCPA', function () {
+      var l = buildEnLetter(fullProfile, enBroker);
+      if (l.body.indexOf('Article 17 GDPR') === -1) return 'нет Article 17 GDPR';
+      if (l.body.indexOf('CCPA') === -1) return 'нет CCPA';
+      if (l.body.indexOf('§1798.105') === -1) return 'нет §1798.105';
+      return true;
+    });
+
+    check('Язык письма берётся из сервиса, явный выбор его переопределяет', function () {
+      if (buildLetter(fullProfile, enBroker).language !== 'en') return 'EN-сервис дал не английское письмо';
+      if (buildLetter(fullProfile, ruBroker).language !== 'ru') return 'RU-сервис дал не русское письмо';
+      if (buildLetter(fullProfile, enBroker, 'ru').language !== 'ru') return 'явный язык не переопределил язык сервиса';
+      return true;
+    });
+
+    check('Пустые поля не попадают в письмо', function () {
+      var body = buildRuLetter(emptyProfile, ruBroker).body;
+      var bad = ['Адрес:', 'Город:', 'Год рождения:', 'Номер телефона:', 'Адрес электронной почты:', 'undefined', 'null'];
+      for (var i = 0; i < bad.length; i++) {
+        if (body.indexOf(bad[i]) !== -1) return 'в письме встретилось «' + bad[i] + '»';
+      }
+      return true;
+    });
+
+    check('Заполненные поля попадают в письмо', function () {
+      var body = buildRuLetter(fullProfile, ruBroker).body;
+      return (body.indexOf('Иван Иванов') !== -1 && body.indexOf('ivan@example.com') !== -1 && body.indexOf('ул. Ленина, 1') !== -1)
+        ? true : 'не все поля подставлены';
+    });
+
+    check('Письмо без профиля остаётся корректным', function () {
+      var l = buildEnLetter({}, enBroker);
+      if (/undefined|NaN/.test(l.body + l.subject)) return 'в письме есть undefined/NaN';
+      if (l.body.indexOf('a data subject') === -1) return 'нет подстановки «a data subject»';
+      return true;
+    });
+
+    check('PII-фильтр ловит email', function () {
+      return detectPII('как удалить a@b.co?').indexOf('email') !== -1 ? true : 'email не найден';
+    });
+
+    check('PII-фильтр ловит телефон в разных формах', function () {
+      var forms = ['+7 900 123-45-67', '+79001234567', '8 (900) 123-45-67'];
+      for (var i = 0; i < forms.length; i++) {
+        if (detectPII('мой номер ' + forms[i]).indexOf('phone') === -1) return 'не поймал: ' + forms[i];
+      }
+      return true;
+    });
+
+    check('PII-фильтр не блокирует обычный вопрос', function () {
+      return detectPII('Как сослаться на ст. 21 152-ФЗ?').length === 0 ? true : 'ложное срабатывание';
+    });
+
+    check('PII-фильтр не падает на пустом вводе', function () {
+      return (Array.isArray(detectPII('')) && detectPII(null).length === 0) ? true : 'ошибка на пустом вводе';
+    });
+
+    check('Статистика: KPI считаются верно', function () {
+      var t = new Date(2026, 10, 8);
+      var reqs = [
+        { id: 1, status: 'deleted', broker_category: 'people_search', method: 'form', sent_at: '2026-09-20T10:00:00Z', responded_at: '2026-09-25T10:00:00Z', deleted_at: '2026-09-27T10:00:00Z', deadline_at: '2026-10-20' },
+        { id: 2, status: 'deleted', broker_category: 'data_broker', method: 'email', sent_at: '2026-10-10T10:00:00Z', responded_at: '2026-10-15T10:00:00Z', deleted_at: '2026-10-16T10:00:00Z', deadline_at: '2026-11-09' },
+        { id: 3, status: 'sent', broker_category: 'marketing', method: 'email', sent_at: '2026-09-30T10:00:00Z', deadline_at: '2026-10-30' },
+        { id: 4, status: 'draft', broker_category: 'search', method: 'form' }
+      ];
+      var s = computeStats(reqs, { today: t, profileFilled: true });
+      if (s.kpi.sent !== 3) return 'sent = ' + s.kpi.sent + ', ожидалось 3';
+      if (s.kpi.deleted !== 2) return 'deleted = ' + s.kpi.deleted;
+      if (s.kpi.overdue !== 1) return 'overdue = ' + s.kpi.overdue;
+      if (s.kpi.drafts !== 1) return 'drafts = ' + s.kpi.drafts;
+      if (s.kpi.deletion_rate !== 66.7) return 'deletion_rate = ' + s.kpi.deletion_rate + ', ожидалось 66.7';
+      if (s.kpi.avg_response_days == null) return 'среднее время ответа не посчитано';
+      return true;
+    });
+
+    check('Статистика: активность за 14 дней', function () {
+      var t = new Date(2026, 10, 8);
+      var reqs = [
+        { id: 1, status: 'sent', method: 'email', broker_category: 'search', sent_at: '2026-11-08T09:00:00Z', deadline_at: '2026-12-08' },
+        { id: 2, status: 'sent', method: 'email', broker_category: 'search', sent_at: '2026-11-08T11:00:00Z', deadline_at: '2026-12-08' },
+        { id: 3, status: 'sent', method: 'email', broker_category: 'search', sent_at: '2026-10-26T11:00:00Z', deadline_at: '2026-11-25' }
+      ];
+      var s = computeStats(reqs, { today: t });
+      if (s.activity.length !== 14) return 'дней в серии: ' + s.activity.length;
+      var sum = s.activity.reduce(function (a, b) { return a + b.count; }, 0);
+      if (sum !== 3) return 'сумма столбцов = ' + sum;
+      if (s.activity[13].count !== 2) return 'за сегодня ожидалось 2';
+      return true;
+    });
+
+    check('Дедлайн 30 дней: ожидание и просрочка', function () {
+      var t = new Date(2026, 10, 8);
+      var d1 = isoDay(addDays(t, 30));
+      var s = computeStats([{ id: 1, status: 'sent', method: 'email', broker_category: 'search', sent_at: t.toISOString(), deadline_at: d1 }], { today: t });
+      if (s.kpi.waiting !== 1) return 'waiting = ' + s.kpi.waiting;
+      if (s.deadlines[0].days_left !== 30) return 'days_left = ' + s.deadlines[0].days_left;
+      return true;
+    });
+
+    check('Статистика на пустом списке не даёт NaN', function () {
+      var s = computeStats([]);
+      var bad = Object.keys(s.kpi).some(function (k) { return typeof s.kpi[k] === 'number' && isNaN(s.kpi[k]); });
+      if (bad) return 'в KPI есть NaN';
+      if (s.tips.length !== 1) return 'ожидалась одна подсказка, получено ' + s.tips.length;
+      return true;
+    });
+
+    check('Воронка: разрешённые и запрещённые переходы', function () {
+      if (!canTransition('draft', 'sent')) return 'draft → sent должен быть разрешён';
+      if (!canTransition('sent', 'responded')) return 'sent → responded должен быть разрешён';
+      if (!canTransition('refused', 'draft')) return 'refused → draft («Повторить») должен быть разрешён';
+      if (canTransition('deleted', 'sent')) return 'deleted → sent должен быть запрещён';
+      return true;
+    });
+
+    check('Демо-статистика собирается и не содержит ПД', function () {
+      var t = new Date(2026, 10, 8);
+      var demo = buildDemoRequests(t);
+      var s = computeStats(demo, { today: t, demo: true });
+      if (demo.length !== 12) return 'записей: ' + demo.length;
+      if (!s.kpi.deleted || !s.kpi.overdue) return 'демо не даёт ни удалений, ни просрочек';
+      if (JSON.stringify(demo).indexOf('@') !== -1) return 'в демо-данных есть email';
+      return true;
+    });
+
+    check('Экранирование HTML в выводе', function () {
+      var out = esc('<script>alert(1)<\/script>');
+      return (out.indexOf('<') === -1 && out.indexOf('&lt;') !== -1) ? true : 'экранирование не работает';
+    });
+
+    check('Сериализация состояния (JSON round-trip)', function () {
+      var obj = { profile: fullProfile, requests: [{ id: 1, status: 'draft' }] };
+      var back = JSON.parse(JSON.stringify(obj));
+      return (back.profile.full_name === fullProfile.full_name && back.requests[0].status === 'draft')
+        ? true : 'round-trip сломан';
+    });
+
+    check('Хранилище: запись, чтение, удаление', function () {
+      var probe = 'dc.selftest.' + Date.now();
+      var okWrite = Store.set(probe, { a: 1 });
+      var back = Store.get(probe, null);
+      Store.del(probe);
+      if (!okWrite || !back || back.a !== 1) return 'запись/чтение не работает';
+      return true;
+    });
+
+    var passed = results.filter(function (r) { return r.pass; }).length;
+    var html = '<div class="pill ' + (passed === results.length ? 'ok' : 'bad') + '" style="margin-bottom:12px">' +
+      passed + ' из ' + results.length + ' проверок пройдено</div>' +
+      '<div class="self-test-result">' + results.map(function (r) {
+        return '<div class="tr ' + (r.pass ? 'pass' : 'fail') + '"><span class="st">' + (r.pass ? 'OK' : 'FAIL') + '</span>' +
+          '<div><div>' + esc(r.name) + '</div>' +
+          (r.pass ? '' : '<div class="detail">' + esc(r.detail) + '</div>') + '</div></div>';
+      }).join('') + '</div>' +
+      '<p class="tiny" style="margin-top:12px">Проверяются тексты писем (152-ФЗ, GDPR, CCPA), пустые поля, PII-фильтр, KPI и воронка, дедлайн 30 дней, серия активности, переходы статусов, экранирование HTML и хранилище.</p>';
+    openModal('Самопроверка логики', html, [{ label: 'Закрыть', cls: 'primary', onClick: closeModal }]);
+    if (passed === results.length) toast('Самопроверка: все ' + results.length + ' проверок пройдены', 'ok');
+    else toast('Самопроверка: ошибок — ' + (results.length - passed), 'bad', 6000);
+  }
+
+  /* ============================== ОБНОВЛЕНИЕ ============================== */
+  async function refreshAll() {
+    if (state.server) {
+      var rq = await http('GET', 'api/requests');
+      state.requests = (rq && rq.items) || [];
+    } else {
+      state.requests = localRequests();
+    }
+    if (state.view === 'dashboard') renderDashboard();
+    if (state.view === 'requests') renderRequests();
+    if (state.view === 'catalog') renderCatalog();
+    if (state.view === 'data') renderData();
+  }
+
+  /* ================================ СОБЫТИЯ ================================ */
+  function bind() {
+    $('#nav').addEventListener('click', function (e) {
+      var btn = e.target.closest('button[data-view]');
+      if (btn) navigate(btn.dataset.view);
+    });
+    $('#brand').addEventListener('click', function () { navigate('dashboard'); });
+    $('#modal-close').addEventListener('click', closeModal);
+    $('#modal').addEventListener('click', function (e) { if (e.target.id === 'modal') closeModal(); });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && $('#modal').classList.contains('open')) closeModal();
+    });
+
+    $('#btn-self-test').addEventListener('click', selfTest);
+
+    $('#btn-demo').addEventListener('click', async function () {
+      try {
+        state.demo = await Api.demoStats();
+        if (state.view !== 'dashboard') navigate('dashboard');
+        paintDashboard(state.demo);
+        toast('Загружена демо-статистика: данные не сохранены');
+      } catch (e) {
+        toast('Не удалось загрузить демо: ' + e.message, 'bad');
+      }
+    });
+
+    $('#btn-new-request').addEventListener('click', openNewRequestModal);
+    $('#btn-new-request-2').addEventListener('click', openNewRequestModal);
+    $('#btn-add-broker').addEventListener('click', openAddBrokerModal);
+
+    $('#profile-form').addEventListener('submit', async function (e) {
+      e.preventDefault();
+      var p = {
+        full_name: clean($('#pf-name').value),
+        emails: listOf($('#pf-emails').value),
+        phones: listOf($('#pf-phones').value),
+        city: clean($('#pf-city').value),
+        birth_year: clean($('#pf-birth').value),
+        address: clean($('#pf-address').value),
+        language: $('#pf-lang').value
+      };
+      if (p.birth_year && !/^\d{4}$/.test(p.birth_year)) { toast('Год рождения — четыре цифры', 'warn'); return; }
+      try {
+        var res = await Api.saveProfile(p);
+        renderProfile();
+        toast(res.detail || 'Профиль сохранён');
+      } catch (err) {
+        toast('Ошибка сохранения: ' + err.message, 'bad', 6000);
+      }
+    });
+
+    ['#pf-name', '#pf-emails', '#pf-phones', '#pf-city', '#pf-birth', '#pf-address'].forEach(function (sel) {
+      var el = $(sel);
+      if (el) el.addEventListener('input', function () {
+        renderProfilePreview({
+          full_name: $('#pf-name').value, emails: $('#pf-emails').value, phones: $('#pf-phones').value,
+          city: $('#pf-city').value, birth_year: $('#pf-birth').value, address: $('#pf-address').value
+        });
+      });
+    });
+
+    $('#btn-profile-clear').addEventListener('click', function () {
+      ['#pf-name', '#pf-emails', '#pf-phones', '#pf-city', '#pf-birth', '#pf-address'].forEach(function (s) { $(s).value = ''; });
+      renderProfilePreview({});
+      toast('Форма очищена — сохранённый профиль не изменился', 'warn', 5000);
+    });
+
+    $('#cat-filters').addEventListener('click', function (e) {
+      var chip = e.target.closest('.chip');
+      if (!chip) return;
+      state.filterCat = chip.dataset.cat;
+      $$('#cat-filters .chip').forEach(function (c) { c.classList.toggle('active', c === chip); });
+      renderCatalog();
+    });
+
+    $('#status-filters').addEventListener('click', function (e) {
+      var chip = e.target.closest('.chip');
+      if (!chip) return;
+      state.filterStatus = chip.dataset.status;
+      $$('#status-filters .chip').forEach(function (c) { c.classList.toggle('active', c === chip); });
+      renderRequests();
+    });
+
+    $('#broker-list').addEventListener('click', async function (e) {
+      var btn = e.target.closest('button[data-act]');
+      if (!btn) return;
+      var act = btn.dataset.act;
+      try {
+        if (act === 'create') {
+          btn.disabled = true;
+          var res = await Api.createRequest(btn.dataset.broker, null);
+          await refreshAll();
+          toast('Черновик создан');
+          var full = await Api.getRequestFull(res.request.id);
+          openLetterModal(full.request, full.letter, full.events || []);
+        }
+        if (act === 'del-broker') {
+          if (!confirm('Удалить этот сервис из каталога?')) return;
+          await Api.deleteBroker(btn.dataset.broker);
+          renderCatalog();
+          toast('Сервис удалён');
+        }
+        if (act === 'goto-request') {
+          state.filterStatus = 'all';
+          $$('#status-filters .chip').forEach(function (c) { c.classList.toggle('active', c.dataset.status === 'all'); });
+          navigate('requests');
+        }
+      } catch (err) {
+        toast('Ошибка: ' + err.message, 'bad');
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    $('#request-list').addEventListener('click', async function (e) {
+      var btn = e.target.closest('button[data-act]');
+      if (!btn) return;
+      var id = btn.dataset.id;
+      var act = btn.dataset.act;
+      var req = state.requests.filter(function (r) { return String(r.id) === String(id); })[0];
+      if (!req) return;
+      try {
+        if (act === 'view') {
+          var full = await Api.getRequestFull(id);
+          openLetterModal(full.request, full.letter, full.events || []);
+        }
+        if (act === 'send') {
+          btn.disabled = true;
+          var res = await Api.send(id);
+          await refreshAll();
+          toast(res.detail || 'Готово', res.ok === false ? 'bad' : 'ok', 7000);
+          if (res.ok !== false && req.method === 'email' && req.to_email) {
+            var full2 = await Api.getRequestFull(id);
+            openLetterModal(full2.request, full2.letter, full2.events || []);
+          }
+        }
+        if (act === 'status') {
+          var target = btn.dataset.status;
+          if (target === 'draft' && !confirm('Вернуть запрос в черновик для повторной отправки?')) return;
+          await Api.setStatus(id, target, null);
+          await refreshAll();
+          toast('Статус: ' + (STATUS_LABELS[target] || target));
+        }
+        if (act === 'note') openNoteModal(req);
+        if (act === 'del') {
+          if (!confirm('Удалить запрос и его историю?')) return;
+          await Api.deleteRequest(id);
+          await refreshAll();
+          toast('Запрос удалён');
+        }
+      } catch (err) {
+        toast('Ошибка: ' + err.message, 'bad', 6000);
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    $('#btn-ai-send').addEventListener('click', sendChat);
+    $('#chat-input').addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); sendChat(); }
+    });
+    $('#view-ai').addEventListener('click', function (e) {
+      var chip = e.target.closest('.chip[data-q]');
+      if (chip) { $('#chat-input').value = chip.dataset.q; sendChat(); }
+    });
+    $('#btn-ai-settings').addEventListener('click', openAiSettingsModal);
+    $('#btn-ai-clear').addEventListener('click', function () {
+      state.chat = [];
+      Store.set(K.chat, []);
+      renderAI();
+      toast('История чата очищена');
+    });
+
+    $('#btn-export').addEventListener('click', async function () {
+      try {
+        var data = await Api.exportData();
+        var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'datacleaner-export-' + isoDay(todayDate()) + '.json';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
+        toast('Экспорт скачан. В файле ваши ПД — храните его аккуратно', 'warn', 7000);
+      } catch (e) {
+        toast('Ошибка экспорта: ' + e.message, 'bad');
+      }
+    });
+
+    $('#btn-backup').addEventListener('click', async function () {
+      try {
+        var data = await Api.exportData();
+        var ok = await copyText(JSON.stringify(data, null, 2));
+        toast(ok ? 'JSON скопирован в буфер' : 'Не удалось скопировать (возможно, большой объём)', ok ? 'ok' : 'warn');
+      } catch (e) {
+        toast('Ошибка: ' + e.message, 'bad');
+      }
+    });
+
+    $('#btn-wipe').addEventListener('click', openWipeModal);
+  }
+
+  /* ================================= ЗАПУСК ================================= */
+  /* Код доступа: сервер вернул 401 с флагом auth_required */
+  function askAccessToken(message) {
+    var html = '<div class="banner">' + ICONS.warn +
+      '<div>Этот сервер защищён кодом доступа: он закрывает API от посторонних.' +
+      (message ? ' <br>' + esc(message) : '') + '</div></div>' +
+      '<div class="field"><label for="access-code">Код доступа</label>' +
+      '<input id="access-code" type="password" placeholder="ACCESS_TOKEN" autocomplete="off" autofocus>' +
+      '<div class="help">Значение переменной окружения ACCESS_TOKEN на сервере. Хранится только в этом браузере.</div></div>';
+    openModal('Нужен код доступа', html, [
+      {
+        label: 'Подключиться', cls: 'primary', icon: 'check', onClick: async function (btn) {
+          var code = clean($('#access-code').value);
+          if (!code) { toast('Введите код доступа', 'warn'); return; }
+          Store.set(K.token, code);
+          btn.disabled = true;
+          closeModal();
+          try {
+            await Api.init();
+            attachBadge();
+            renderProfile(); renderAI(); renderCatalog(); renderRequests(); renderData();
+            await renderDashboard();
+            toast('Подключено к серверу');
+          } catch (e) {
+            if (e.authRequired) {
+              Store.del(K.token);
+              toast('Код не подошёл', 'bad');
+              askAccessToken('Код не подошёл, попробуйте снова.');
+            } else {
+              toast('Ошибка: ' + e.message, 'bad', 8000);
+            }
+          } finally { btn.disabled = false; }
+        }
+      },
+      {
+        label: 'Работать локально', cls: 'ghost', onClick: function () {
+          Store.del(K.token);
+          state.server = false;
+          state.brokers = BUILTIN_BROKERS.slice();
+          state.requests = localRequests();
+          state.profile = Store.get(K.profile, {}) || {};
+          closeModal();
+          attachBadge();
+          renderProfile(); renderAI(); renderCatalog(); renderRequests(); renderData();
+          renderDashboard();
+          toast('Режим LOCAL: данные в этом браузере', 'warn', 6000);
+        }
+      }
+    ]);
+  }
+
+  function attachBadge() {
+    var badge = $('#mode-badge');
+    badge.textContent = state.server ? 'server' : 'local';
+    badge.classList.toggle('server', state.server);
+    badge.title = state.server
+      ? 'Подключено к FastAPI: данные в SQLite, зашифрованы Fernet'
+      : 'Автономный режим: данные в localStorage вашего браузера';
+  }
+
+  async function boot() {
+    bind();
+    var needsToken = false;
+    try {
+      await Api.init();
+    } catch (e) {
+      if (e && e.authRequired) {
+        needsToken = true;
+      } else {
+        console.error(e);
+        toast('Ошибка инициализации: ' + e.message, 'bad', 8000);
+      }
+    }
+    if (needsToken) {
+      state.server = true;
+      attachBadge();
+      askAccessToken('');
+      return;
+    }
+    attachBadge();
+
+    if (!storageOK && !state.server) {
+      toast('localStorage недоступен: данные будут потеряны после перезагрузки', 'warn', 9000);
+    }
+    try {
+      renderProfile();
+      renderAI();
+      renderCatalog();
+      renderRequests();
+      renderData();
+      await renderDashboard();
+    } catch (e) {
+      console.error(e);
+      toast('Ошибка отрисовки: ' + e.message, 'bad', 8000);
+    }
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+
+})();
+
+</script>
+</body>
+</html>

@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0f1a">
+<meta name="description" content="DataCleaner — находите и удаляйте свои персональные данные из интернета: брокеры данных, people-search, маркетинговые базы. 152-ФЗ, GDPR, CCPA.">
+<title>DataCleaner — удаление персональных данных из интернета</title>
+<style>
+/* ============================================================
+   DataCleaner — один файл, без внешних CSS/JS/шрифтов/картинок.
+   Тёмная тема, градиенты, мягкие тени, адаптив от 320px.
+   ============================================================ */
+:root{
+  --bg:#080b14;
+  --bg-2:#0b1020;
+  --panel:rgba(255,255,255,.045);
+  --panel-2:rgba(255,255,255,.07);
+  --stroke:rgba(255,255,255,.09);
+  --stroke-2:rgba(255,255,255,.16);
+  --text:#e8ecf6;
+  --muted:#8d97b0;
+  --muted-2:#6b7590;
+  --acc:#7c5cff;
+  --acc-2:#22d3ee;
+  --acc-3:#f472b6;
+  --ok:#34d399;
+  --warn:#fbbf24;
+  --bad:#fb7185;
+  --r-lg:22px;
+  --r-md:16px;
+  --r-sm:11px;
+  --shadow:0 18px 50px -22px rgba(0,0,0,.9), 0 2px 10px rgba(0,0,0,.35);
+  --shadow-soft:0 10px 30px -18px rgba(0,0,0,.85);
+  --grad:linear-gradient(135deg,#7c5cff 0%,#5b8cff 45%,#22d3ee 100%);
+  --grad-2:linear-gradient(135deg,#f472b6,#7c5cff 60%,#22d3ee);
+  --ff:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans",sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  font-family:var(--ff);
+  color:var(--text);
+  background:var(--bg);
+  min-height:100vh;
+  line-height:1.55;
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+  overflow-x:hidden;
+}
+body::before{
+  content:"";position:fixed;inset:0;z-index:-2;pointer-events:none;
+  background:
+    radial-gradient(900px 520px at 8% -8%, rgba(124,92,255,.30), transparent 65%),
+    radial-gradient(820px 520px at 96% 2%, rgba(34,211,238,.20), transparent 62%),
+    radial-gradient(760px 460px at 62% 108%, rgba(244,114,182,.16), transparent 65%),
+    linear-gradient(180deg,#080b14 0%,#0a0e1a 40%,#070a12 100%);
+}
+body::after{
+  content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.35;
+  background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);
+  background-size:64px 64px;
+  mask-image:radial-gradient(circle at 50% 0%,#000 0%,transparent 78%);
+  -webkit-mask-image:radial-gradient(circle at 50% 0%,#000 0%,transparent 78%);
+}
+a{color:#9db4ff;text-decoration:none}
+a:hover{text-decoration:underline}
+button,input,select,textarea{font:inherit;color:inherit}
+::selection{background:rgba(124,92,255,.45)}
+
+/* ---------- scrollbars ---------- */
+*{scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.18) transparent}
+*::-webkit-scrollbar{width:9px;height:9px}
+*::-webkit-scrollbar-thumb{background:rgba(255,255,255,.16);border-radius:99px}
+*::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.26)}
+
+/* ---------- top bar ---------- */
+.topbar{
+  position:sticky;top:0;z-index:50;
+  display:flex;align-items:center;gap:14px;
+  padding:10px max(14px,env(safe-area-inset-left)) 10px max(14px,env(safe-area-inset-right));
+  background:rgba(8,11,20,.72);
+  backdrop-filter:blur(18px) saturate(140%);
+  -webkit-backdrop-filter:blur(18px) saturate(140%);
+  border-bottom:1px solid var(--stroke);
+}
+.brand{display:flex;align-items:center;gap:10px;flex:0 0 auto;cursor:pointer;user-select:none}
+.brand-logo{
+  width:36px;height:36px;border-radius:12px;display:grid;place-items:center;
+  background:var(--grad);box-shadow:0 8px 22px -8px rgba(124,92,255,.9);
+  flex:0 0 auto;
+}
+.brand-logo svg{width:20px;height:20px;display:block}
+.brand-name{font-weight:700;letter-spacing:.2px;font-size:16px;white-space:nowrap}
+.brand-name span{background:var(--grad-2);-webkit-background-clip:text;background-clip:text;color:transparent}
+.badge-mode{
+  font-size:10.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;
+  padding:3px 8px;border-radius:99px;border:1px solid var(--stroke-2);color:var(--muted);
+  white-space:nowrap;
+}
+.badge-mode.server{color:#a9f5e4;border-color:rgba(52,211,153,.4);background:rgba(52,211,153,.1)}
+.nav{
+  display:flex;gap:4px;align-items:center;overflow-x:auto;flex:1 1 auto;
+  scrollbar-width:none;-webkit-overflow-scrolling:touch;
+}
+.nav::-webkit-scrollbar{display:none}
+.nav button{
+  border:0;background:transparent;color:var(--muted);font-weight:600;font-size:13.5px;
+  padding:9px 13px;border-radius:11px;cursor:pointer;white-space:nowrap;
+  transition:color .18s,background .18s,transform .18s;
+}
+.nav button:hover{color:var(--text);background:var(--panel)}
+.nav button.active{color:#fff;background:linear-gradient(135deg,rgba(124,92,255,.35),rgba(34,211,238,.22));box-shadow:inset 0 0 0 1px rgba(255,255,255,.12)}
+.topbar .spacer{flex:0 0 auto}
+
+/* ---------- layout ---------- */
+main{max-width:1220px;margin:0 auto;padding:22px max(14px,env(safe-area-inset-left)) 90px max(14px,env(safe-area-inset-right))}
+.view{display:none;animation:fade .35s ease both}
+.view.active{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes pop{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:none}}
+
+.card{
+  background:linear-gradient(160deg,rgba(255,255,255,.062),rgba(255,255,255,.028));
+  border:1px solid var(--stroke);border-radius:var(--r-lg);
+  box-shadow:var(--shadow);padding:20px;position:relative;overflow:hidden;
+  transition:transform .25s cubic-bezier(.2,.8,.2,1),border-color .25s,box-shadow .25s;
+}
+.card::after{
+  content:"";position:absolute;inset:0;pointer-events:none;border-radius:inherit;
+  background:linear-gradient(120deg,rgba(255,255,255,.10),transparent 30%);opacity:.5;
+}
+.card.hover:hover{transform:translateY(-3px);border-color:var(--stroke-2)}
+.card h3{margin:0 0 4px;font-size:14px;letter-spacing:.2px;font-weight:700}
+.card .sub{color:var(--muted);font-size:12.5px;margin:0 0 16px}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:16px}
+.stack{display:grid;gap:16px}
+
+/* ---------- hero ---------- */
+.hero{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;justify-content:space-between;margin:6px 0 20px}
+.hero h1{margin:0;font-size:clamp(24px,4vw,38px);line-height:1.12;letter-spacing:-.6px}
+.hero h1 em{font-style:normal;background:var(--grad-2);-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero p{margin:8px 0 0;color:var(--muted);max-width:62ch;font-size:14px}
+.hero-actions{display:flex;gap:9px;flex-wrap:wrap}
+
+/* ---------- buttons ---------- */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  border-radius:12px;border:1px solid var(--stroke-2);background:var(--panel);
+  color:var(--text);font-weight:650;font-size:13.5px;padding:10px 15px;cursor:pointer;
+  transition:transform .16s,background .18s,border-color .18s,opacity .18s,box-shadow .18s;
+  text-decoration:none;white-space:nowrap;
+}
+.btn:hover{transform:translateY(-1px);background:var(--panel-2);border-color:rgba(255,255,255,.26)}
+.btn:active{transform:translateY(0) scale(.99)}
+.btn:disabled{opacity:.45;cursor:not-allowed;transform:none}
+.btn svg{width:15px;height:15px}
+.btn.primary{
+  background:var(--grad);border-color:transparent;color:#0a0a14;font-weight:750;
+  box-shadow:0 12px 28px -14px rgba(124,92,255,.95);
+}
+.btn.primary:hover{box-shadow:0 16px 34px -14px rgba(124,92,255,1)}
+.btn.ghost{background:transparent}
+.btn.danger{border-color:rgba(251,113,133,.42);color:#ffc2cc;background:rgba(251,113,133,.10)}
+.btn.danger:hover{background:rgba(251,113,133,.18)}
+.btn.ok{border-color:rgba(52,211,153,.4);color:#b6f7dd;background:rgba(52,211,153,.1)}
+.btn.sm{padding:6px 10px;font-size:12px;border-radius:9px;gap:6px}
+.btn.sm svg{width:13px;height:13px}
+.btn.wide{width:100%}
+
+/* ---------- KPI ---------- */
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.kpi{
+  padding:16px 16px 14px;border-radius:18px;border:1px solid var(--stroke);
+  background:linear-gradient(165deg,rgba(255,255,255,.075),rgba(255,255,255,.025));
+  box-shadow:var(--shadow-soft);position:relative;overflow:hidden;
+  transition:transform .25s,border-color .25s;
+}
+.kpi:hover{transform:translateY(-2px);border-color:var(--stroke-2)}
+.kpi .kpi-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
+.kpi .kpi-label{font-size:11.5px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);font-weight:700}
+.kpi .kpi-dot{width:30px;height:30px;border-radius:10px;display:grid;place-items:center;background:rgba(255,255,255,.07);border:1px solid var(--stroke)}
+.kpi .kpi-dot svg{width:15px;height:15px}
+.kpi .kpi-value{font-size:clamp(26px,3.4vw,34px);font-weight:800;letter-spacing:-1px;line-height:1;font-variant-numeric:tabular-nums}
+.kpi .kpi-hint{color:var(--muted-2);font-size:11.5px;margin-top:8px}
+.kpi.ok .kpi-value{color:#6ee7b7}
+.kpi.warn .kpi-value{color:#fcd34d}
+.kpi.bad .kpi-value{color:#fda4af}
+.kpi.acc .kpi-value{background:var(--grad-2);-webkit-background-clip:text;background-clip:text;color:transparent}
+.kpi .glow{position:absolute;right:-30px;bottom:-40px;width:120px;height:120px;border-radius:50%;filter:blur(28px);opacity:.35}
+
+/* ---------- ring ---------- */
+.ring-wrap{display:flex;align-items:center;gap:22px;flex-wrap:wrap}
+.ring{
+  --p:0;--c1:#7c5cff;--c2:#22d3ee;
+  width:150px;height:150px;border-radius:50%;flex:0 0 auto;position:relative;
+  background:conic-gradient(from -90deg,var(--c1) 0%,var(--c2) calc(var(--p) * 1%),rgba(255,255,255,.075) calc(var(--p) * 1%),rgba(255,255,255,.075) 100%);
+  transition:background .8s ease;
+  box-shadow:0 0 42px -12px rgba(124,92,255,.65), inset 0 0 30px rgba(0,0,0,.4);
+}
+.ring::before{
+  content:"";position:absolute;inset:13px;border-radius:50%;
+  background:radial-gradient(circle at 30% 20%,#141a2c,#0a0e19 70%);
+  border:1px solid rgba(255,255,255,.07);
+}
+.ring .ring-center{
+  position:absolute;inset:0;display:grid;place-content:center;text-align:center;gap:2px;
+}
+.ring .ring-num{font-size:30px;font-weight:800;letter-spacing:-1.2px;font-variant-numeric:tabular-nums;line-height:1}
+.ring .ring-cap{font-size:10.5px;letter-spacing:.9px;text-transform:uppercase;color:var(--muted);font-weight:700}
+.ring-legend{display:grid;gap:10px;flex:1 1 180px;min-width:170px}
+.legend-row{display:flex;align-items:center;gap:9px;font-size:13px;color:var(--muted)}
+.legend-row b{color:var(--text);margin-left:auto;font-variant-numeric:tabular-nums}
+.legend-dot{width:9px;height:9px;border-radius:3px;flex:0 0 auto}
+
+/* ---------- bars / funnel ---------- */
+.funnel{display:grid;gap:12px}
+.bar-row{display:grid;gap:6px}
+.bar-head{display:flex;justify-content:space-between;font-size:12.5px;color:var(--muted)}
+.bar-head b{color:var(--text);font-variant-numeric:tabular-nums}
+.bar-track{height:10px;border-radius:99px;background:rgba(255,255,255,.07);overflow:hidden;position:relative}
+.bar-fill{
+  height:100%;border-radius:99px;background:var(--grad);width:0;
+  transition:width .9s cubic-bezier(.2,.8,.2,1);
+  box-shadow:0 0 18px -4px rgba(124,92,255,.8);
+}
+.bar-fill.c2{background:linear-gradient(90deg,#22d3ee,#5b8cff)}
+.bar-fill.c3{background:linear-gradient(90deg,#34d399,#22d3ee)}
+.bar-fill.c4{background:linear-gradient(90deg,#fbbf24,#f472b6)}
+.bar-fill.c5{background:linear-gradient(90deg,#fb7185,#a855f7)}
+
+/* ---------- activity chart ---------- */
+.chart{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:5px;height:168px;padding:6px 2px 0}
+.chart .col{display:grid;grid-template-rows:1fr auto;justify-items:center;align-items:end;height:100%}
+.chart .bar{
+  width:100%;max-width:32px;border-radius:9px 9px 4px 4px;min-height:4px;align-self:end;
+  background:linear-gradient(180deg,#22d3ee,#7c5cff);
+  box-shadow:0 -6px 18px -8px rgba(34,211,238,.9);
+  transition:height .8s cubic-bezier(.2,.8,.2,1),filter .2s;
+  position:relative;
+}
+.chart .bar.zero{background:rgba(255,255,255,.09);box-shadow:none}
+.chart .col:hover .bar{filter:brightness(1.25)}
+.chart .cl{font-size:9px;color:var(--muted-2);white-space:nowrap;letter-spacing:.2px;padding-top:6px;opacity:.85}
+.chart .bar span{
+  position:absolute;top:-17px;left:50%;transform:translateX(-50%);
+  font-size:10px;font-weight:700;color:var(--text);opacity:0;transition:opacity .2s;
+}
+.chart .col:hover .bar span{opacity:1}
+.chart .col:hover .bar span{opacity:1}
+
+/* ---------- deadlines ---------- */
+.dl-list{display:grid;gap:9px;max-height:340px;overflow:auto;padding-right:2px}
+.dl{
+  display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:13px;
+  background:rgba(255,255,255,.04);border:1px solid var(--stroke);font-size:13px;
+  transition:background .18s,border-color .18s;
+}
+.dl:hover{background:rgba(255,255,255,.07);border-color:var(--stroke-2)}
+.dl .nm{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dl .dt{font-size:11.5px;color:var(--muted-2);white-space:nowrap}
+.pill{
+  font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px;white-space:nowrap;
+  border:1px solid transparent;letter-spacing:.2px;
+}
+.pill.ok{color:#a7f3d0;background:rgba(52,211,153,.14);border-color:rgba(52,211,153,.3)}
+.pill.warn{color:#fde68a;background:rgba(251,191,36,.14);border-color:rgba(251,191,36,.32)}
+.pill.bad{color:#fecdd3;background:rgba(251,113,133,.15);border-color:rgba(251,113,133,.34)}
+.pill.neutral{color:#c3cbe0;background:rgba(255,255,255,.07);border-color:var(--stroke-2)}
+.pill.acc{color:#d6ccff;background:rgba(124,92,255,.2);border-color:rgba(124,92,255,.4)}
+
+/* ---------- tips ---------- */
+.tips{display:grid;gap:10px}
+.tip{
+  display:flex;gap:11px;padding:12px 13px;border-radius:14px;font-size:13px;
+  background:linear-gradient(120deg,rgba(124,92,255,.13),rgba(34,211,238,.07));
+  border:1px solid rgba(124,92,255,.22);color:#dfe5f5;
+}
+.tip svg{width:16px;height:16px;flex:0 0 auto;margin-top:2px;opacity:.9}
+.tip.warn{background:linear-gradient(120deg,rgba(251,191,36,.13),rgba(251,113,133,.07));border-color:rgba(251,191,36,.25)}
+
+/* ---------- forms ---------- */
+.field{display:grid;gap:6px;margin-bottom:14px}
+.field label{font-size:12.5px;font-weight:650;color:var(--muted);letter-spacing:.2px}
+.field .help{font-size:11.5px;color:var(--muted-2)}
+input[type=text],input[type=email],input[type=tel],input[type=password],input[type=url],input[type=number],select,textarea{
+  width:100%;padding:11px 13px;border-radius:12px;
+  background:rgba(6,9,17,.72);border:1px solid var(--stroke-2);color:var(--text);
+  transition:border-color .18s,box-shadow .18s,background .18s;font-size:14px;
+}
+input::placeholder,textarea::placeholder{color:#5b6480}
+input:focus,select:focus,textarea:focus{
+  outline:none;border-color:rgba(124,92,255,.75);
+  box-shadow:0 0 0 3.5px rgba(124,92,255,.18),0 0 28px -12px rgba(124,92,255,.9);
+  background:rgba(8,12,22,.9);
+}
+textarea{resize:vertical;min-height:96px;line-height:1.6}
+select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,#8d97b0 50%),linear-gradient(135deg,#8d97b0 50%,transparent 50%);background-position:calc(100% - 18px) 50%,calc(100% - 13px) 50%;background-size:5px 5px,5px 5px;background-repeat:no-repeat;padding-right:34px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.row-3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.inline{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
+.chips{display:flex;gap:7px;flex-wrap:wrap}
+.chip{
+  font-size:12px;font-weight:650;padding:7px 12px;border-radius:99px;cursor:pointer;
+  border:1px solid var(--stroke-2);background:var(--panel);color:var(--muted);
+  transition:all .18s;user-select:none;
+}
+.chip:hover{color:var(--text);background:var(--panel-2)}
+.chip.active{color:#0a0a14;background:var(--grad);border-color:transparent;font-weight:750}
+
+/* ---------- broker cards ---------- */
+.brokers{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px;margin-top:16px}
+.broker{
+  display:flex;flex-direction:column;gap:11px;padding:16px;border-radius:18px;
+  background:linear-gradient(165deg,rgba(255,255,255,.06),rgba(255,255,255,.022));
+  border:1px solid var(--stroke);box-shadow:var(--shadow-soft);
+  transition:transform .22s,border-color .22s;
+}
+.broker:hover{transform:translateY(-2px);border-color:var(--stroke-2)}
+.broker .b-top{display:flex;gap:9px;align-items:flex-start}
+.broker .b-name{font-weight:750;font-size:14.5px;line-height:1.3;flex:1 1 auto}
+.broker .b-cat{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;font-weight:700}
+.broker .b-notes{font-size:12.5px;color:var(--muted);flex:1 1 auto}
+.broker .b-meta{display:flex;gap:6px;flex-wrap:wrap}
+.broker .b-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:2px}
+.verify{
+  display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;
+  color:#fde68a;background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.3);
+  padding:3px 8px;border-radius:99px;text-transform:uppercase;letter-spacing:.4px;
+}
+.verify svg{width:11px;height:11px}
+
+/* ---------- requests list ---------- */
+.req{
+  display:grid;gap:11px;padding:16px;border-radius:18px;
+  background:linear-gradient(165deg,rgba(255,255,255,.055),rgba(255,255,255,.022));
+  border:1px solid var(--stroke);box-shadow:var(--shadow-soft);
+  transition:border-color .2s,transform .2s;
+}
+.req:hover{border-color:var(--stroke-2);transform:translateY(-1px)}
+.req-head{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.req-name{font-weight:750;font-size:15px;flex:1 1 auto;min-width:120px}
+.req-meta{display:flex;gap:8px;flex-wrap:wrap;font-size:11.5px;color:var(--muted-2)}
+.req-meta span{display:inline-flex;align-items:center;gap:5px}
+.req-meta svg{width:12px;height:12px;opacity:.8}
+.req-actions{display:flex;gap:7px;flex-wrap:wrap}
+.timeline{display:grid;gap:0;margin-top:4px;border-left:1px dashed rgba(255,255,255,.16);padding-left:14px}
+.tl-item{position:relative;padding:5px 0;font-size:12.5px;color:var(--muted)}
+.tl-item::before{content:"";position:absolute;left:-19px;top:11px;width:8px;height:8px;border-radius:50%;background:var(--acc);box-shadow:0 0 10px rgba(124,92,255,.9)}
+.tl-item.bad::before{background:var(--bad);box-shadow:0 0 10px rgba(251,113,133,.9)}
+.tl-item.ok::before{background:var(--ok);box-shadow:0 0 10px rgba(52,211,153,.9)}
+.tl-item .t-when{color:var(--muted-2);font-size:11px;margin-left:6px}
+.empty{
+  text-align:center;padding:44px 20px;color:var(--muted);border:1px dashed var(--stroke-2);
+  border-radius:18px;background:rgba(255,255,255,.02);font-size:13.5px;
+}
+.empty strong{display:block;color:var(--text);font-size:15px;margin-bottom:6px}
+
+/* ---------- AI chat ---------- */
+.chat{display:grid;gap:12px;max-height:min(56vh,520px);overflow:auto;padding:4px 2px 4px 0;margin-bottom:14px}
+.msg{display:flex;gap:10px;animation:pop .28s ease both}
+.msg .av{
+  width:30px;height:30px;border-radius:10px;flex:0 0 auto;display:grid;place-items:center;
+  font-size:12px;font-weight:800;background:rgba(255,255,255,.08);border:1px solid var(--stroke);
+}
+.msg.user .av{background:linear-gradient(135deg,#5b8cff,#22d3ee);color:#08111d;border-color:transparent}
+.msg.bot .av{background:linear-gradient(135deg,#7c5cff,#f472b6);color:#0d0716;border-color:transparent}
+.msg .bubble{
+  padding:11px 14px;border-radius:15px;font-size:13.5px;line-height:1.62;
+  background:rgba(255,255,255,.05);border:1px solid var(--stroke);white-space:pre-wrap;
+  word-break:break-word;max-width:min(100%,74ch);
+}
+.msg.user .bubble{background:linear-gradient(135deg,rgba(91,140,255,.22),rgba(34,211,238,.14));border-color:rgba(91,140,255,.34)}
+.msg.bot .bubble b{color:#d5cbff}
+.msg.sys .bubble{background:rgba(251,191,36,.1);border-color:rgba(251,191,36,.3);color:#fde68a;font-size:12.5px}
+.chat-input{display:flex;gap:9px;align-items:flex-end}
+.chat-input textarea{min-height:52px;max-height:170px}
+.suggestions{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px}
+
+/* ---------- modal ---------- */
+.modal{
+  position:fixed;inset:0;z-index:120;display:none;place-items:center;padding:18px;
+  background:rgba(3,5,10,.72);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+}
+.modal.open{display:grid;animation:fade .22s ease both}
+.modal-box{
+  width:min(760px,100%);max-height:88vh;display:flex;flex-direction:column;
+  background:linear-gradient(165deg,#12172a,#0b1020);
+  border:1px solid var(--stroke-2);border-radius:22px;box-shadow:0 40px 90px -30px #000;
+  overflow:hidden;animation:pop .25s ease both;
+}
+.modal-head{display:flex;align-items:center;gap:12px;padding:16px 18px;border-bottom:1px solid var(--stroke)}
+.modal-head h3{margin:0;font-size:15px;flex:1 1 auto}
+.modal-body{padding:18px;overflow:auto}
+.modal-foot{padding:14px 18px;border-top:1px solid var(--stroke);display:flex;gap:9px;flex-wrap:wrap;justify-content:flex-end}
+.letter{
+  white-space:pre-wrap;font-size:13px;line-height:1.65;background:rgba(4,7,14,.8);
+  border:1px solid var(--stroke);border-radius:14px;padding:15px;max-height:52vh;overflow:auto;
+  font-family:var(--mono);color:#d9e2f5;
+}
+.close-x{
+  border:0;background:rgba(255,255,255,.07);color:var(--muted);width:32px;height:32px;
+  border-radius:10px;cursor:pointer;font-size:16px;line-height:1;display:grid;place-items:center;
+}
+.close-x:hover{background:rgba(255,255,255,.14);color:#fff}
+
+/* ---------- toasts ---------- */
+.toasts{position:fixed;right:14px;bottom:14px;z-index:200;display:grid;gap:9px;max-width:min(380px,calc(100vw - 28px))}
+.toast{
+  padding:12px 15px;border-radius:14px;font-size:13px;font-weight:600;
+  background:rgba(16,22,38,.96);border:1px solid var(--stroke-2);
+  box-shadow:0 20px 45px -20px #000;color:var(--text);
+  animation:slideIn .3s cubic-bezier(.2,.8,.2,1) both;display:flex;gap:9px;align-items:flex-start;
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+}
+.toast.ok{border-color:rgba(52,211,153,.45);box-shadow:0 20px 45px -20px #000,inset 0 0 0 1px rgba(52,211,153,.12)}
+.toast.bad{border-color:rgba(251,113,133,.5)}
+.toast.warn{border-color:rgba(251,191,36,.5)}
+.toast svg{width:15px;height:15px;flex:0 0 auto;margin-top:2px}
+.toast.out{animation:slideOut .25s ease forwards}
+@keyframes slideIn{from{opacity:0;transform:translateX(26px) scale(.97)}to{opacity:1;transform:none}}
+@keyframes slideOut{to{opacity:0;transform:translateX(26px) scale(.97)}}
+
+/* ---------- misc ---------- */
+.banner{
+  display:flex;gap:11px;align-items:flex-start;padding:13px 15px;border-radius:15px;font-size:12.8px;
+  background:linear-gradient(120deg,rgba(251,191,36,.14),rgba(124,92,255,.1));
+  border:1px solid rgba(251,191,36,.3);color:#f6e6bd;margin-bottom:16px;
+}
+.banner svg{width:16px;height:16px;flex:0 0 auto;margin-top:2px}
+.banner.info{background:linear-gradient(120deg,rgba(34,211,238,.12),rgba(124,92,255,.1));border-color:rgba(34,211,238,.28);color:#c8ecf7}
+.hr{height:1px;background:var(--stroke);margin:16px 0;border:0}
+.muted{color:var(--muted)}
+.tiny{font-size:11.5px;color:var(--muted-2)}
+.code{
+  font-family:var(--mono);font-size:11.5px;background:rgba(0,0,0,.45);border:1px solid var(--stroke);
+  padding:2px 6px;border-radius:6px;color:#b9c6e6;word-break:break-all;
+}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:12.5px}
+.kv dt{color:var(--muted-2)}
+.kv dd{margin:0;color:var(--text)}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.self-test-result{display:grid;gap:8px}
+.tr{display:flex;gap:9px;align-items:flex-start;font-size:13px;padding:9px 11px;border-radius:11px;background:rgba(255,255,255,.04);border:1px solid var(--stroke)}
+.tr .st{font-weight:800;font-size:11px;padding:2px 7px;border-radius:6px;flex:0 0 auto}
+.tr.pass .st{background:rgba(52,211,153,.16);color:#6ee7b7}
+.tr.fail .st{background:rgba(251,113,133,.18);color:#fda4af}
+.tr .detail{color:var(--muted);font-size:11.5px;margin-top:2px}
+
+/* ---------- responsive ---------- */
+@media (max-width:1080px){
+  .kpi-grid{grid-template-columns:repeat(2,1fr)}
+  .grid-3{grid-template-columns:1fr}
+}
+@media (max-width:860px){
+  .grid-2{grid-template-columns:1fr}
+  .topbar{flex-wrap:wrap;padding-bottom:8px}
+  .nav{order:3;width:100%;flex:1 0 100%}
+  .nav button{flex:0 0 auto}
+  main{padding-top:16px}
+  .ring{width:126px;height:126px}
+  .ring .ring-num{font-size:25px}
+}
+@media (max-width:600px){
+  .kpi-grid{grid-template-columns:1fr 1fr;gap:10px}
+  .kpi{padding:13px 13px 12px;border-radius:16px}
+  .kpi .kpi-value{font-size:26px}
+  .card{padding:16px;border-radius:18px}
+  .row,.row-3{grid-template-columns:1fr}
+  .hero h1{font-size:25px}
+  .hero-actions .btn{flex:1 1 auto}
+  .chart{height:120px}
+  .chart .cl{font-size:8px}
+  .brand-name{font-size:15px}
+  .topbar .btn.self-test{padding:8px 11px;font-size:12px}
+  .toasts{left:12px;right:12px;bottom:12px;max-width:none}
+  .modal-box{max-height:92vh;border-radius:18px}
+  .req-actions .btn{flex:1 1 auto}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.001ms !important;transition-duration:.001ms !important}
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand" id="brand" title="На главную">
+    <div class="brand-logo" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#0a0a14" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 3l7 4v5c0 4.5-3 7.6-7 9-4-1.4-7-4.5-7-9V7l7-4z"/>
+        <path d="M9 12.5l2 2 4-4.5"/>
+      </svg>
+    </div>
+    <div>
+      <div class="brand-name">Data<span>Cleaner</span></div>
+    </div>
+    <span class="badge-mode" id="mode-badge">local</span>
+  </div>
+
+  <nav class="nav" id="nav" aria-label="Разделы">
+    <button data-view="dashboard" class="active">Обзор</button>
+    <button data-view="profile">Профиль</button>
+    <button data-view="catalog">Каталог</button>
+    <button data-view="requests">Запросы</button>
+    <button data-view="ai">AI-помощник</button>
+    <button data-view="data">Данные</button>
+  </nav>
+
+  <button class="btn ghost sm self-test" id="btn-self-test" title="Проверить логику приложения">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+    Самопроверка
+  </button>
+</header>
+
+<main>
+  <!-- ===================== ОБЗОР ===================== -->
+  <section class="view active" id="view-dashboard">
+    <div class="hero">
+      <div>
+        <h1>Ваши данные — <em>только ваши</em></h1>
+        <p>Отправляйте требования об удалении по 152-ФЗ, GDPR и CCPA, следите за сроками 30 дней и видьте реальную картину: сколько сервисов ответило, сколько удалило и где пора жаловаться регулятору.</p>
+      </div>
+      <div class="hero-actions">
+        <button class="btn" id="btn-demo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg>
+          Демо-статистика
+        </button>
+        <button class="btn primary" id="btn-new-request">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+          Новый запрос
+        </button>
+      </div>
+    </div>
+
+    <div id="demo-banner"></div>
+
+    <div class="kpi-grid">
+      <div class="kpi acc">
+        <div class="glow" style="background:#7c5cff"></div>
+        <div class="kpi-top">
+          <div class="kpi-label">Отправлено</div>
+          <div class="kpi-dot" style="color:#b9a7ff">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+          </div>
+        </div>
+        <div class="kpi-value" id="kpi-sent">0</div>
+        <div class="kpi-hint" id="kpi-sent-hint">писем и обращений</div>
+      </div>
+      <div class="kpi warn">
+        <div class="glow" style="background:#fbbf24"></div>
+        <div class="kpi-top">
+          <div class="kpi-label">Ждут ответа</div>
+          <div class="kpi-dot" style="color:#fcd34d">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+          </div>
+        </div>
+        <div class="kpi-value" id="kpi-waiting">0</div>
+        <div class="kpi-hint" id="kpi-waiting-hint">в пределах 30 дней</div>
+      </div>
+      <div class="kpi bad">
+        <div class="glow" style="background:#fb7185"></div>
+        <div class="kpi-top">
+          <div class="kpi-label">Просрочено</div>
+          <div class="kpi-dot" style="color:#fda4af">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.6L2.5 17a2 2 0 0 0 1.7 3h15.6a2 2 0 0 0 1.7-3L13.7 3.6a2 2 0 0 0-3.4 0z"/></svg>
+          </div>
+        </div>
+        <div class="kpi-value" id="kpi-overdue">0</div>
+        <div class="kpi-hint" id="kpi-overdue-hint">срок ответа истёк</div>
+      </div>
+      <div class="kpi ok">
+        <div class="glow" style="background:#34d399"></div>
+        <div class="kpi-top">
+          <div class="kpi-label">Удалено</div>
+          <div class="kpi-dot" style="color:#6ee7b7">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+          </div>
+        </div>
+        <div class="kpi-value" id="kpi-deleted">0</div>
+        <div class="kpi-hint" id="kpi-deleted-hint">подтверждено сервисами</div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <h3>Процент удаления</h3>
+        <p class="sub">Доля удалённых запросов среди всех, что вы уже отправили.</p>
+        <div class="ring-wrap">
+          <div class="ring" id="ring">
+            <div class="ring-center">
+              <div class="ring-num" id="ring-num">0%</div>
+              <div class="ring-cap">удалено</div>
+            </div>
+          </div>
+          <div class="ring-legend">
+            <div class="legend-row"><span class="legend-dot" style="background:linear-gradient(135deg,#34d399,#22d3ee)"></span>Удалено <b id="lg-deleted">0</b></div>
+            <div class="legend-row"><span class="legend-dot" style="background:linear-gradient(135deg,#fbbf24,#f472b6)"></span>Ответили <b id="lg-responded">0</b></div>
+            <div class="legend-row"><span class="legend-dot" style="background:linear-gradient(135deg,#fb7185,#a855f7)"></span>Отказ <b id="lg-refused">0</b></div>
+            <div class="legend-row"><span class="legend-dot" style="background:rgba(255,255,255,.2)"></span>Черновики <b id="lg-drafts">0</b></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Скорость ответов</h3>
+        <p class="sub">Среднее время от отправки до реакции сервиса.</p>
+        <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:6px">
+          <div style="font-size:44px;font-weight:800;letter-spacing:-2px;line-height:1;background:var(--grad-2);-webkit-background-clip:text;background-clip:text;color:transparent;font-variant-numeric:tabular-nums" id="avg-days">—</div>
+          <div class="muted" style="font-size:13px">дней в среднем</div>
+        </div>
+        <p class="tiny" style="margin:0 0 14px" id="avg-note">Пока нет ответов от сервисов.</p>
+        <div class="funnel" id="rate-bars"></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <h3>Воронка по этапам</h3>
+      <p class="sub">Черновик → Отправлено → Ответили → Удалено. Отказ — отдельная ветка.</p>
+      <div class="funnel" id="funnel"></div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <h3>Активность за 14 дней</h3>
+        <p class="sub">Сколько запросов вы отправляли каждый день.</p>
+        <div class="chart" id="chart"></div>
+      </div>
+      <div class="card">
+        <h3>По категориям</h3>
+        <p class="sub">Где сосредоточены ваши данные.</p>
+        <div class="funnel" id="categories"></div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <h3>Дедлайны</h3>
+        <p class="sub">30 дней с даты получения требования (ст. 20 152-ФЗ, Art. 12(3) GDPR).</p>
+        <div class="dl-list" id="deadlines"></div>
+      </div>
+      <div class="card">
+        <h3>Что делать дальше</h3>
+        <p class="sub">Подсказки по вашей текущей ситуации.</p>
+        <div class="tips" id="tips"></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <h3>Приватность по умолчанию</h3>
+      <p class="tiny" style="margin:0" id="privacy-note">
+        «Прочитано» не отслеживается: DataCleaner не вставляет трекинг-пиксели, внешние картинки и редирект-ссылки в письма — получатель не должен быть объектом слежки. Учитываются только ответы сервисов и подтверждения удаления.
+      </p>
+    </div>
+  </section>
+
+  <!-- ===================== ПРОФИЛЬ ===================== -->
+  <section class="view" id="view-profile">
+    <div class="hero">
+      <div>
+        <h1>Профиль</h1>
+        <p>Введите только то, что нужно для поиска. Данные подставляются в письма локально — в AI-модель они не уходят.</p>
+      </div>
+    </div>
+
+    <div class="banner info">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16v-4"/><path d="M12 8h.01"/><circle cx="12" cy="12" r="9"/></svg>
+      <div id="storage-note">В браузерной версии данные лежат в localStorage вашего устройства. В серверной — в SQLite, зашифрованные Fernet (AES-128-CBC + HMAC). Полей, которые не заполнены, в письме просто не будет.</div>
+    </div>
+
+    <form class="card" id="profile-form" autocomplete="off">
+      <h3>Персональные данные</h3>
+      <p class="sub">Все поля необязательные, кроме ФИО и хотя бы одного email — без них письмо получится безымянным.</p>
+      <div class="row">
+        <div class="field">
+          <label for="pf-name">ФИО полностью</label>
+          <input type="text" id="pf-name" placeholder="Иванов Иван Иванович">
+          <div class="help">Как в документах — брокеры ищут по точному совпадению.</div>
+        </div>
+        <div class="field">
+          <label for="pf-birth">Год рождения</label>
+          <input type="text" id="pf-birth" inputmode="numeric" maxlength="4" placeholder="1990">
+          <div class="help">Помогает отличить вас от однофамильцев.</div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label for="pf-emails">Email (через запятую)</label>
+          <input type="text" id="pf-emails" placeholder="ivan@example.com, ivan.work@example.com">
+          <div class="help">Первый адрес используется для ответа оператора.</div>
+        </div>
+        <div class="field">
+          <label for="pf-phones">Телефоны (через запятую)</label>
+          <input type="text" id="pf-phones" placeholder="+7 900 000-00-00">
+          <div class="help">Лучше в формате, в котором они попадают в базы.</div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label for="pf-city">Город</label>
+          <input type="text" id="pf-city" placeholder="Петрозаводск">
+        </div>
+        <div class="field">
+          <label for="pf-address">Адрес (необязательно)</label>
+          <input type="text" id="pf-address" placeholder="ул. Ленина, 1, кв. 1">
+          <div class="help">Добавляйте, только если он уже засветился в базах.</div>
+        </div>
+      </div>
+      <div class="field" style="max-width:280px">
+        <label for="pf-lang">Язык писем по умолчанию</label>
+        <select id="pf-lang">
+          <option value="ru">Русский (152-ФЗ)</option>
+          <option value="en">English (GDPR / CCPA)</option>
+        </select>
+      </div>
+      <div class="inline">
+        <button class="btn primary" type="submit">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+          Сохранить профиль
+        </button>
+        <button class="btn ghost" type="button" id="btn-profile-clear">Очистить форму</button>
+        <span class="tiny" id="profile-saved-at"></span>
+      </div>
+    </form>
+
+    <div class="card" style="margin-top:16px">
+      <h3>Что попадёт в письмо</h3>
+      <p class="sub">Предпросмотр блока с персональными данными — пустые поля не выводятся.</p>
+      <div class="letter" id="profile-preview" style="max-height:240px">Заполните профиль, чтобы увидеть предпросмотр.</div>
+    </div>
+  </section>
+
+  <!-- ===================== КАТАЛОГ ===================== -->
+  <section class="view" id="view-catalog">
+    <div class="hero">
+      <div>
+        <h1>Каталог сервисов</h1>
+        <p>Брокеры данных, people-search, маркетинговые базы и поисковики. Ссылки нужно проверять: сервисы меняют адреса форм и политики.</p>
+      </div>
+      <div class="hero-actions">
+        <button class="btn" id="btn-add-broker">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+          Свой сервис
+        </button>
+      </div>
+    </div>
+
+    <div class="banner">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.6L2.5 17a2 2 0 0 0 1.7 3h15.6a2 2 0 0 0 1.7-3L13.7 3.6a2 2 0 0 0-3.4 0z"/></svg>
+      <div>Точные URL и email меняются, а часть сервисов ограничивает opt-out по региону. Перед отправкой откройте ссылку и убедитесь, что форма/адрес актуальны — в карточках это помечено как «проверить перед использованием».</div>
+    </div>
+
+    <div class="chips" id="cat-filters">
+      <button class="chip active" data-cat="all">Все</button>
+      <button class="chip" data-cat="people_search">People-search</button>
+      <button class="chip" data-cat="data_broker">Брокеры данных</button>
+      <button class="chip" data-cat="marketing">Маркетинг</button>
+      <button class="chip" data-cat="search">Поисковики</button>
+      <button class="chip" data-cat="custom">Свои</button>
+    </div>
+
+    <div class="brokers" id="broker-list"></div>
+  </section>
+
+  <!-- ===================== ЗАПРОСЫ ===================== -->
+  <section class="view" id="view-requests">
+    <div class="hero">
+      <div>
+        <h1>Запросы</h1>
+        <p>Черновик → Отправлено → Ответили → Удалено. Ветка «Отказ» и кнопка «Повторить» возвращают запрос в черновик. История изменений хранится у каждого запроса.</p>
+      </div>
+      <div class="hero-actions">
+        <button class="btn primary" id="btn-new-request-2">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+          Новый запрос
+        </button>
+      </div>
+    </div>
+
+    <div class="chips" id="status-filters">
+      <button class="chip active" data-status="all">Все</button>
+      <button class="chip" data-status="draft">Черновики</button>
+      <button class="chip" data-status="sent">Отправлено</button>
+      <button class="chip" data-status="responded">Ответили</button>
+      <button class="chip" data-status="deleted">Удалено</button>
+      <button class="chip" data-status="refused">Отказ</button>
+    </div>
+
+    <div class="stack" id="request-list" style="margin-top:16px"></div>
+  </section>
+
+  <!-- ===================== AI ===================== -->
+  <section class="view" id="view-ai">
+    <div class="hero">
+      <div>
+        <h1>AI-помощник</h1>
+        <p>Подскажет, как правильно составить требование, сослаться на норму и что делать, если оператор молчит. Персональные данные в модель не отправляются.</p>
+      </div>
+      <div class="hero-actions">
+        <button class="btn ghost" id="btn-ai-settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1A1.7 1.7 0 0 0 8.9 19a1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 4.5 15a1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 9 4.6 1.7 1.7 0 0 0 10 3.1V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1A1.7 1.7 0 0 0 19.4 9c.2.6.8 1 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+          Настройки
+        </button>
+        <button class="btn ghost" id="btn-ai-clear">Очистить чат</button>
+      </div>
+    </div>
+
+    <div class="banner info" id="ai-status-banner">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16v-4"/><path d="M12 8h.01"/><circle cx="12" cy="12" r="9"/></svg>
+      <div id="ai-status-text">Проверяю настройки AI…</div>
+    </div>
+
+    <div class="card">
+      <div class="chat" id="chat"></div>
+      <div class="suggestions">
+        <button class="chip" data-q="Оператор не ответил за 30 дней — какие шаги и куда жаловаться?">Не ответили 30 дней</button>
+        <button class="chip" data-q="Как сослаться на ст. 21 152-ФЗ, если данные в общедоступном источнике?">Данные «общедоступны»</button>
+        <button class="chip" data-q="Что писать в запросе по CCPA, если я не в Калифорнии?">CCPA не из США</button>
+        <button class="chip" data-q="Как уменьшить цифровой след за месяц: план по шагам">План на месяц</button>
+      </div>
+      <div class="chat-input">
+        <textarea id="chat-input" rows="2" placeholder="Спросите: «Что делать, если брокер отказал со ссылкой на First Amendment?»"></textarea>
+        <button class="btn primary" id="btn-ai-send" style="height:48px">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+          Спросить
+        </button>
+      </div>
+      <p class="tiny" style="margin:10px 0 0">Фильтр ПД проверяет вопрос локально: если в тексте есть email, телефон или номер документа — запрос в модель не уходит. Ответы AI — информационная справка, не юридическое заключение.</p>
+    </div>
+  </section>
+
+  <!-- ===================== ДАННЫЕ ===================== -->
+  <section class="view" id="view-data">
+    <div class="hero">
+      <div>
+        <h1>Ваши данные</h1>
+        <p>Экспорт, полная очистка и настройки хранения. Всё, что вы видите, можно удалить одной кнопкой.</p>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <h3>Экспорт</h3>
+        <p class="sub">JSON с профилем, запросами, текстами писем и историей. В файле будут ваши ПД в открытом виде — храните его как конфиденциальный документ.</p>
+        <div class="inline">
+          <button class="btn" id="btn-export">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+            Скачать JSON
+          </button>
+          <button class="btn" id="btn-backup">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4z"/><path d="M8 4v8h8V4"/><path d="M8 16h8"/></svg>
+            Копировать в буфер
+          </button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Полная очистка</h3>
+        <p class="sub">Удаляет профиль, все запросы, историю и ваши сервисы. Действие необратимо.</p>
+        <div class="inline">
+          <button class="btn danger" id="btn-wipe">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+            Удалить всё
+          </button>
+        </div>
+        <p class="tiny" style="margin:12px 0 0" id="wipe-note">В браузерной версии очищается localStorage, в серверной — таблицы SQLite (профиль, запросы, события, свои сервисы).</p>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <h3>Как хранятся данные</h3>
+      <dl class="kv" id="storage-kv"></dl>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <h3>Чего этот сервис не делает</h3>
+      <div class="tips" style="margin-top:10px">
+        <div class="tip">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+          <div>Не ставит трекинг-пиксели и не отслеживает «прочитано» — это нарушает приватность получателя.</div>
+        </div>
+        <div class="tip">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+          <div>Не отправляет ваши ПД в AI-модель: фильтр блокирует вопросы с email/телефоном, письма собираются локально.</div>
+        </div>
+        <div class="tip">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+          <div>Не ходит в сторонние трекеры и не грузит внешние скрипты — в файле нет ни одного внешнего ресурса.</div>
+        </div>
+        <div class="tip warn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.6L2.5 17a2 2 0 0 0 1.7 3h15.6a2 2 0 0 0 1.7-3L13.7 3.6a2 2 0 0 0-3.4 0z"/></svg>
+          <div>Не гарантирует удаление: результат зависит от оператора. Задача сервиса — сделать процедуру корректной и отслеживаемой.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<div class="modal" id="modal" role="dialog" aria-modal="true">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 id="modal-title">Окно</h3>
+      <button class="close-x" id="modal-close" aria-label="Закрыть">✕</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-foot" id="modal-foot"></div>
+  </div>
+</div>
+</body>
+</html>
