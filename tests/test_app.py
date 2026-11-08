@@ -294,3 +294,134 @@ def test_index_page_is_served():
     assert r.status_code == 200
     assert "DataCleaner" in r.text
     assert "<script" in r.text
+
+
+# ------------------------------------------------- настройки: SMTP и автопилот
+def test_settings_never_leak_password():
+    r = client.put("/api/settings", json={"smtp": {
+        "host": "smtp.example.com", "port": 587, "user": "me@example.com",
+        "password": "super-secret", "from_addr": "me@example.com",
+        "from_name": "DataCleaner", "use_ssl": False, "use_starttls": True,
+    }})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["smtp"]["has_password"] is True
+    assert "password" not in body["smtp"]
+    assert "super-secret" not in r.text
+    # пароль лежит в базе только в шифрованном виде
+    with db.get_conn() as conn:
+        raw = conn.execute("SELECT value FROM kv WHERE key = 'settings.v1'").fetchone()[0]
+    assert "super-secret" not in raw
+
+
+def test_settings_keep_password_when_field_is_empty():
+    client.put("/api/settings", json={"smtp": {"host": "smtp.example.com", "from_addr": "me@example.com",
+                                               "password": "keep-me"}})
+    client.put("/api/settings", json={"smtp": {"host": "smtp.example.com", "from_addr": "me@example.com"}})
+    body = client.get("/api/settings").json()
+    assert body["smtp"]["has_password"] is True
+    assert body["resolved"]["ready"] is True
+
+
+def test_settings_autopilot_defaults_and_update():
+    body = client.get("/api/settings").json()
+    assert body["autopilot"]["auto_send"] is False
+    assert body["autopilot"]["followup_days"] == 30
+    assert body["presets"]  # подсказки для Gmail/Яндекса/…
+    updated = client.put("/api/settings", json={"autopilot": {"auto_send": True, "followup_days": 21}}).json()
+    assert updated["autopilot"]["auto_send"] is True and updated["autopilot"]["followup_days"] == 21
+    # значения из env не подменяются мусором
+    assert updated["autopilot"]["interval_minutes"] == 15
+
+
+def test_smtp_test_endpoint_reports_missing_host():
+    client.put("/api/settings", json={"smtp": {"host": "", "user": "", "from_addr": ""}})
+    r = client.post("/api/settings/smtp/test", json={})
+    assert r.status_code == 200
+    assert r.json()["ok"] is False and r.json()["detail"]
+
+
+def test_knowledge_base_is_available_without_llm():
+    body = client.get("/api/knowledge").json()
+    assert body["ok"] is True and len(body["facts"]) >= 10
+    text = " ".join(f["text"] for f in body["facts"])
+    assert "152-ФЗ" in text and "GDPR" in text
+
+
+def test_models_endpoint_without_config_is_graceful():
+    body = client.get("/api/models").json()
+    assert body["ok"] is False and body["models"] == []
+
+
+# ------------------------------------------------------------------ автопилот
+def test_autopilot_marks_form_requests_as_manual():
+    rid = client.post("/api/requests", json={"broker_id": "spokeo"}).json()["request"]["id"]
+    report = client.post("/api/autopilot/run").json()["report"]
+    assert [m["id"] for m in report["manual"]] == [rid]
+    assert report["sent"] == [] and report["errors"] == []
+    assert report["started_at"] and report["finished_at"]
+
+
+def test_autopilot_sends_drafts_when_forced():
+    client.put("/api/profile", json=PROFILE)
+    rid = client.post("/api/requests", json={"broker_id": "ru-152-template"}).json()["request"]["id"]
+    report = client.post("/api/autopilot/run").json()["report"]
+    assert [s["id"] for s in report["sent"]] == [rid]
+    row = client.get(f"/api/requests/{rid}").json()["request"]
+    assert row["status"] == "sent" and row["sent_at"]
+
+
+def test_autosend_endpoint_sends_all_drafts():
+    client.put("/api/profile", json=PROFILE)
+    client.post("/api/requests", json={"broker_id": "ru-152-template"})
+    client.post("/api/requests", json={"broker_id": "eu-gdpr-template"})
+    body = client.post("/api/requests/autosend").json()
+    assert body["ok"] is True and len(body["sent"]) == 2 and body["dry_run"] is True
+
+
+def test_followup_requires_sent_status():
+    rid = client.post("/api/requests", json={"broker_id": "ru-152-template"}).json()["request"]["id"]
+    assert client.post(f"/api/requests/{rid}/followup").json()["ok"] is False
+    client.post(f"/api/requests/{rid}/send", json={})
+    body = client.post(f"/api/requests/{rid}/followup").json()
+    assert body["ok"] is True and body["letter"]["kind"] == "followup"
+    assert "Повторное" in body["letter"]["subject"]
+    types = [e["type"] for e in client.get(f"/api/requests/{rid}").json()["events"]]
+    assert "followup" in types
+
+
+def test_complaint_letter_is_built_locally():
+    client.put("/api/profile", json=PROFILE)
+    # российский брокер → жалоба в Роскомнадзор
+    ru = client.post("/api/requests", json={"broker_id": "ru-152-template"}).json()["request"]["id"]
+    client.post(f"/api/requests/{ru}/send", json={})
+    ru_letter = client.post(f"/api/requests/{ru}/complaint").json()["letter"]
+    assert ru_letter["kind"] == "complaint_rkn" and "Роскомнадзор" in ru_letter["body"]
+    assert "13.11" in ru_letter["body"] and "Иван Иванов" in ru_letter["body"]
+    # американский сервис → жалоба в надзорный орган по GDPR
+    us = client.post("/api/requests", json={"broker_id": "spokeo"}).json()["request"]["id"]
+    client.post(f"/api/requests/{us}/send", json={})
+    us_letter = client.post(f"/api/requests/{us}/complaint").json()["letter"]
+    assert us_letter["kind"] == "complaint_dpa"
+    assert "Article 77 GDPR" in us_letter["subject"] and "Article 12(3) GDPR" in us_letter["body"]
+
+
+def test_assistant_stream_reports_not_configured():
+    with client.stream("POST", "/api/assistant/stream", json={"question": "Как удалить данные?", "mode": "advice"}) as r:
+        assert r.status_code == 200
+        payload = "".join(chunk for chunk in r.iter_text())
+    assert "not_configured" in payload
+
+
+def test_assistant_stream_blocks_pii():
+    with client.stream("POST", "/api/assistant/stream",
+                       json={"question": "мой телефон +7 900 123-45-67, как удалить?", "mode": "advice"}) as r:
+        payload = "".join(chunk for chunk in r.iter_text())
+    assert "blocked" in payload and "phone" in payload
+
+
+def test_health_reports_autopilot_and_version():
+    body = client.get("/api/health").json()
+    assert body["version"].startswith("1.")
+    assert body["autopilot"]["followup_days"] == 30
+    assert body["dry_run"] is True

@@ -76,6 +76,8 @@ class SendIn(BaseModel):
 class ChatIn(BaseModel):
     question: str = Field(..., min_length=2, max_length=4000)
     history: list[dict[str, Any]] = Field(default_factory=list)
+    mode: Literal["advice", "plan", "letter", "complaint"] = "advice"
+    context: dict[str, Any] | None = None
 
 
 class ApiResult(BaseModel):

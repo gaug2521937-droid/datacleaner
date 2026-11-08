@@ -1,6 +1,6 @@
 /* ==================================================================
    DataCleaner · 04-actions.js — действия, модальные сценарии,
-   «Самопроверка», привязка событий и запуск приложения.
+   AI-поток, «Самопроверка», привязка событий и запуск приложения.
    ================================================================== */
 
   async function copyText(text) {
@@ -23,12 +23,24 @@
     } catch (e) { return false; }
   }
 
-  function letterText(subject, body) {
-    return 'Тема: ' + subject + '\n\n' + body;
+  function letterText(subject, body) { return 'Тема: ' + subject + '\n\n' + body; }
+
+  function download(name, text, mime) {
+    try {
+      var blob = new Blob([text], { type: mime || 'text/plain;charset=utf-8' });
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1200);
+      return true;
+    } catch (e) { return false; }
   }
 
   /* ---------------------------- новый запрос ---------------------------- */
   function openNewRequestModal() {
+    if (!state.brokers.length) { toast('Каталог не загружен', 'bad'); return; }
     var options = state.brokers.map(function (b) {
       return '<option value="' + esc(b.id) + '">' + esc(b.name) + ' · ' +
         esc(CATEGORY_LABELS[b.category] || b.category) + (b.custom ? ' · свой' : '') + '</option>';
@@ -38,247 +50,582 @@
       '<option value="">Автоматически (по языку сервиса)</option>' +
       '<option value="ru">Русский — ст. 14 и 21 152-ФЗ, срок 30 дней</option>' +
       '<option value="en">English — GDPR Art. 17 и CCPA</option></select></div>' +
-      '<p class="tiny">Письмо собирается локально из вашего профиля. Пустые поля в текст не попадают.</p>';
+      '<div class="banner info" style="margin:0">' + ICONS.info +
+      '<div>Письмо собирается локально: ФИО, email и телефоны подставляются в текст на вашем устройстве и в AI не отправляются. ' +
+      'Пустые поля в письмо не попадают.</div></div>';
     openModal('Новый запрос', html, [
-      { label: 'Отмена', cls: 'ghost', onClick: closeModal },
       {
-        label: 'Создать письмо', cls: 'primary', icon: 'mail', onClick: async function (btn) {
+        label: 'Создать', cls: 'primary', icon: 'mail', onClick: async function (btn) {
+          var brokerId = $('#nr-broker').value;
+          var lang = $('#nr-lang').value || null;
           btn.disabled = true;
           try {
-            var brokerId = $('#nr-broker').value;
-            var lang = $('#nr-lang').value || null;
             var res = await Api.createRequest(brokerId, lang);
             closeModal();
-            await refreshAll();
-            toast('Письмо создано и сохранено как черновик');
-            var full = await Api.getRequestFull(res.request.id);
-            openLetterModal(full.request, full.letter, full.events || []);
+            renderRequests();
+            toast('Запрос создан: ' + (res.request ? res.request.broker_name : brokerId));
+            if (state.settings && state.settings.autopilot && state.settings.autopilot.auto_send) {
+              toast('Автопилот включён — заберу черновик на следующем цикле', 'warn', 6000);
+            }
+            await showLetter(res.request.id);
           } catch (e) {
             toast('Не удалось создать запрос: ' + e.message, 'bad', 6000);
-          } finally { btn.disabled = false; }
+            btn.disabled = false;
+          }
         }
-      }
+      },
+      { label: 'Отмена', cls: 'ghost', onClick: closeModal }
     ]);
   }
 
   /* ------------------------------ письмо ------------------------------ */
-  function openLetterModal(req, letter, events) {
-    var broker = state.brokers.filter(function (b) { return b.id === req.broker_id; })[0] || {};
-    var html = '<div class="inline" style="margin-bottom:12px">' + statusPill(req.status) +
-      '<span class="pill neutral">' + esc(letter.language === 'en' ? 'English / GDPR' : 'Русский / 152-ФЗ') + '</span>' +
-      (req.to_email ? '<span class="pill neutral">' + esc(req.to_email) + '</span>' : '') +
-      (req.deadline_at ? '<span class="pill neutral">дедлайн ' + esc(fmtDate(req.deadline_at)) + '</span>' : '') +
-      '</div>' +
-      '<div class="field"><label>Тема письма</label><div class="letter" style="max-height:none">' + esc(letter.subject) + '</div></div>' +
-      '<div class="field"><label>Текст письма</label><pre class="letter" id="letter-body">' + esc(letter.body) + '</pre></div>' +
-      (broker.url ? '<p class="tiny">Ссылка сервиса: <a href="' + esc(broker.url) + '" target="_blank" rel="noopener noreferrer">' +
-        esc(broker.url) + '</a> — проверьте актуальность перед отправкой.</p>' : '') +
-      '<p class="tiny">Письмо отправляется как обычный текст: без трекинг-пикселей и внешних картинок. «Прочитано» не отслеживается.</p>' +
-      ((events && events.length)
-        ? '<div class="hr"></div><h3 style="font-size:13px;margin:0 0 6px">История изменений</h3><div class="timeline">' +
-        events.map(function (e) {
-          var cls = e.to_status === 'deleted' ? 'ok' : (e.to_status === 'refused' ? 'bad' : '');
-          var label = e.type === 'created' ? 'Создан'
-            : (e.type === 'send' ? 'Отправлен'
-              : (e.type === 'send_failed' ? 'Ошибка отправки'
-                : (e.type === 'repeat' ? 'Возвращён в черновик'
-                  : (STATUS_LABELS[e.to_status] || e.type))));
-          return '<div class="tl-item ' + cls + '">' + esc(label) +
-            (e.note ? ' — ' + esc(e.note) : '') +
-            '<span class="t-when">' + esc(fmtDateTime(e.at || e.created_at)) + '</span></div>';
-        }).join('') + '</div>'
-        : '');
+  async function showLetter(id) {
+    try {
+      var data = await Api.getRequestFull(id);
+      var letter = data.letter || {};
+      var req = data.request || {};
+      var body = '<div class="inline" style="margin-bottom:10px">' +
+        '<span class="pill ' + (STATUS_CLASS[req.status] || 'neutral') + '">' + esc(STATUS_LABELS[req.status] || req.status) + '</span>' +
+        '<span class="badge lang">' + esc((letter.language || 'ru') === 'en' ? 'EN · GDPR / CCPA' : 'RU · 152-ФЗ') + '</span>' +
+        (req.to_email ? '<span class="badge lang">' + esc(req.to_email) + '</span>' : '<span class="badge lang">отправка через форму</span>') +
+        '</div>' +
+        '<div class="field"><label>Тема</label><div class="letter" style="max-height:none">' + esc(letter.subject || req.subject || '') + '</div></div>' +
+        '<div class="letter" style="max-height:340px">' + esc(letter.body || req.body || '') + '</div>' +
+        ((data.events || []).length ? '<h3 style="margin:16px 0 8px;font-size:13px">История</h3><div class="dl-list" style="max-height:170px">' +
+          data.events.map(function (ev) {
+            return '<div class="dl"><span class="pill neutral">' + esc(ev.type) + '</span>' +
+              '<span class="nm">' + esc(ev.note || (ev.from_status + ' → ' + ev.to_status)) + '</span>' +
+              '<span class="dt">' + esc(fmtDateTime(ev.at)) + '</span></div>';
+          }).join('') + '</div>' : '');
 
-    var buttons = [
-      {
-        label: 'Скопировать письмо', cls: 'primary', icon: 'copy', onClick: async function () {
-          var ok = await copyText(letterText(letter.subject, letter.body));
-          toast(ok ? 'Письмо скопировано в буфер' : 'Не удалось скопировать — выделите текст вручную', ok ? 'ok' : 'warn');
+      var buttons = [
+        {
+          label: 'Копировать', icon: 'copy', onClick: async function () {
+            var ok = await copyText(letterText(letter.subject || '', letter.body || ''));
+            toast(ok ? 'Письмо в буфере обмена' : 'Не удалось скопировать — выделите текст вручную', ok ? 'ok' : 'warn');
+          }
+        },
+        {
+          label: 'Скачать .txt', onClick: function () {
+            download('datacleaner-request-' + id + '.txt', letterText(letter.subject || '', letter.body || ''));
+            toast('Файл письма сохранён');
+          }
         }
+      ];
+      if (req.to_email && (letter.subject || req.subject)) {
+        buttons.splice(1, 0, {
+          label: 'Открыть в почте', icon: 'send', onClick: function () {
+            try {
+              var firstEmail = listOf(state.profile.emails)[0] || '';
+              var reply = firstEmail ? '&body=' + encodeURIComponent((letter.body || '') + '\n\n— \n' + firstEmail) : '';
+              var url = 'mailto:' + encodeURIComponent(req.to_email) + '?subject=' + encodeURIComponent(letter.subject || '') + reply;
+              window.open(url, '_blank');
+            } catch (e) { toast('Почтовый клиент не открылся', 'warn'); }
+          }
+        });
       }
-    ];
-    if (req.method === 'email' && req.to_email) {
-      buttons.push({
-        label: 'Открыть в почте', cls: 'ghost', icon: 'mail', onClick: function () {
-          location.href = 'mailto:' + encodeURIComponent(req.to_email) +
-            '?subject=' + encodeURIComponent(letter.subject) +
-            '&body=' + encodeURIComponent(letter.body);
-        }
-      });
+      buttons.push({ label: 'Закрыть', cls: 'ghost', onClick: closeModal });
+      openModal(req.broker_name || 'Письмо', body, buttons);
+    } catch (e) {
+      toast('Не удалось открыть письмо: ' + e.message, 'bad', 6000);
     }
-    if (broker.url) {
-      buttons.push({
-        label: 'Открыть форму', cls: 'ghost', icon: 'link', onClick: function () {
-          window.open(broker.url, '_blank', 'noopener');
-        }
-      });
-    }
-    if (req.status === 'draft') {
-      buttons.push({
-        label: 'Отметить отправленным', cls: 'ok', icon: 'send', onClick: async function (btn) {
-          btn.disabled = true;
-          try {
-            var res = await Api.send(req.id);
-            closeModal();
-            await refreshAll();
-            toast(res.detail || 'Запрос отмечен отправленным', res.ok === false ? 'bad' : 'ok', 7000);
-          } catch (e) {
-            toast('Ошибка отправки: ' + e.message, 'bad', 7000);
-          } finally { btn.disabled = false; }
-        }
-      });
-    }
-    openModal('Письмо · ' + req.broker_name, html, buttons);
   }
 
-  /* ------------------------------ заметка ------------------------------ */
-  function openNoteModal(req) {
-    var html = '<div class="field"><label for="note-input">Заметка к запросу</label>' +
-      '<textarea id="note-input" placeholder="Например: номер обращения с сайта, имя оператора, что ответили">' +
-      esc(req.note || '') + '</textarea>' +
-      '<div class="help">Заметки хранятся вместе с историей запроса.</div></div>';
-    openModal('Заметка · ' + req.broker_name, html, [
-      { label: 'Отмена', cls: 'ghost', onClick: closeModal },
+  function showLetterResult(title, letter, hint) {
+    var body = '<div class="badge lang" style="margin-bottom:10px">' +
+      esc((letter.language || 'ru') === 'en' ? 'EN' : 'RU') + ' · ' + esc(letter.kind || 'letter') + '</div>' +
+      '<div class="field"><label>Тема</label><div class="letter" style="max-height:none">' + esc(letter.subject || '') + '</div></div>' +
+      '<div class="letter" style="max-height:340px">' + esc(letter.body || '') + '</div>' +
+      (hint ? '<div class="banner info" style="margin:12px 0 0">' + ICONS.info + '<div>' + esc(hint) + '</div></div>' : '');
+    openModal(title, body, [
       {
-        label: 'Сохранить', cls: 'primary', icon: 'check', onClick: async function (btn) {
-          btn.disabled = true;
-          try {
-            await Api.setStatus(req.id, null, $('#note-input').value);
-            closeModal();
-            await refreshAll();
-            toast('Заметка сохранена');
-          } catch (e) {
-            toast('Ошибка: ' + e.message, 'bad');
-          } finally { btn.disabled = false; }
+        label: 'Копировать', icon: 'copy', onClick: async function () {
+          var ok = await copyText(letterText(letter.subject || '', letter.body || ''));
+          toast(ok ? 'Текст в буфере обмена' : 'Скопируйте вручную', ok ? 'ok' : 'warn');
         }
-      }
+      },
+      {
+        label: 'Скачать .txt', onClick: function () {
+          download('datacleaner-' + (letter.kind || 'letter') + '.txt', letterText(letter.subject || '', letter.body || ''));
+        }
+      },
+      { label: 'Закрыть', cls: 'ghost', onClick: closeModal }
     ]);
   }
 
   /* ---------------------------- свой сервис ---------------------------- */
   function openAddBrokerModal() {
-    var html = '<div class="row"><div class="field"><label for="ab-name">Название сервиса</label>' +
-      '<input id="ab-name" type="text" placeholder="Например: БКИ «Пример»"></div>' +
-      '<div class="field"><label for="ab-cat">Категория</label><select id="ab-cat">' +
-      ['people_search', 'data_broker', 'marketing', 'search', 'custom'].map(function (c) {
-        return '<option value="' + c + '">' + esc(CATEGORY_LABELS[c]) + '</option>';
-      }).join('') + '</select></div></div>' +
-      '<div class="row"><div class="field"><label for="ab-method">Способ обращения</label><select id="ab-method">' +
-      '<option value="email">email</option><option value="form">форма на сайте</option><option value="manual">вручную</option></select></div>' +
-      '<div class="field"><label for="ab-lang">Язык письма</label><select id="ab-lang">' +
-      '<option value="ru">Русский (152-ФЗ)</option><option value="en">English (GDPR/CCPA)</option></select></div></div>' +
-      '<div class="row"><div class="field"><label for="ab-email">Email для запросов</label>' +
-      '<input id="ab-email" type="text" placeholder="privacy@example.ru"></div>' +
-      '<div class="field"><label for="ab-url">URL формы / сайта</label>' +
-      '<input id="ab-url" type="text" placeholder="https://example.ru/privacy"></div></div>' +
-      '<div class="field"><label for="ab-deadline">Срок ответа, дней</label>' +
-      '<input id="ab-deadline" type="text" inputmode="numeric" value="30"></div>' +
-      '<div class="field"><label for="ab-notes">Заметки</label>' +
-      '<textarea id="ab-notes" placeholder="Где взял адрес, что нужно подтвердить"></textarea></div>';
+    var html = '<div class="row">' +
+      '<div class="field"><label for="nb-name">Название</label><input id="nb-name" type="text" placeholder="ООО «Ромашка»"></div>' +
+      '<div class="field"><label for="nb-cat">Категория</label><select id="nb-cat">' +
+      '<option value="data_broker">Брокер данных</option><option value="people_search">People-search</option>' +
+      '<option value="marketing">Маркетинг</option><option value="search">Поисковик</option></select></div></div>' +
+      '<div class="row">' +
+      '<div class="field"><label for="nb-method">Способ</label><select id="nb-method">' +
+      '<option value="email">Письмо на email</option><option value="form">Форма на сайте</option>' +
+      '<option value="manual">Вручную</option></select></div>' +
+      '<div class="field"><label for="nb-lang">Язык письма</label><select id="nb-lang">' +
+      '<option value="ru">Русский (152-ФЗ)</option><option value="en">English (GDPR)</option></select></div></div>' +
+      '<div class="row">' +
+      '<div class="field"><label for="nb-email">Email для требований</label><input id="nb-email" type="text" placeholder="privacy@example.com"></div>' +
+      '<div class="field"><label for="nb-url">Сайт / страница формы</label><input id="nb-url" type="text" placeholder="https://example.com/privacy"></div></div>' +
+      '<div class="field"><label for="nb-notes">Заметка</label><input id="nb-notes" type="text" placeholder="Например: форма в разделе «Privacy»"></div>';
     openModal('Свой сервис', html, [
-      { label: 'Отмена', cls: 'ghost', onClick: closeModal },
       {
-        label: 'Добавить', cls: 'primary', icon: 'check', onClick: async function (btn) {
-          var name = clean($('#ab-name').value);
+        label: 'Добавить', cls: 'primary', onClick: async function () {
+          var name = clean($('#nb-name').value);
           if (!name) { toast('Укажите название', 'warn'); return; }
-          var method = $('#ab-method').value;
-          var email = clean($('#ab-email').value);
-          var url = clean($('#ab-url').value);
-          if (method === 'email' && !email) { toast('Для способа «email» нужен адрес', 'warn'); return; }
-          if (method === 'form' && !url) { toast('Для способа «форма» нужен URL', 'warn'); return; }
-          btn.disabled = true;
+          var email = clean($('#nb-email').value);
+          var url = clean($('#nb-url').value);
+          var method = $('#nb-method').value;
+          if (method === 'email' && !email) { toast('Для отправки письмом нужен email', 'warn'); return; }
+          var id = 'custom-' + String(name).toLowerCase().replace(/[^a-z0-9а-я]+/gi, '-').slice(0, 40) + '-' + Date.now().toString(36);
           try {
             await Api.addBroker({
-              id: 'custom-' + Date.now(), name: name, category: $('#ab-cat').value, method: method,
-              email: email, url: url, language: $('#ab-lang').value,
-              notes: clean($('#ab-notes').value), deadline_days: Number($('#ab-deadline').value) || 30
+              id: id, name: name, category: $('#nb-cat').value, method: method,
+              email: email, url: url, language: $('#nb-lang').value,
+              notes: clean($('#nb-notes').value), deadline_days: $('#nb-lang').value === 'en' ? 30 : 30
             });
             closeModal();
             renderCatalog();
             toast('Сервис добавлен в каталог');
-          } catch (e) {
-            toast('Ошибка: ' + e.message, 'bad');
-          } finally { btn.disabled = false; }
+          } catch (e) { toast('Ошибка: ' + e.message, 'bad', 6000); }
         }
-      }
+      },
+      { label: 'Отмена', cls: 'ghost', onClick: closeModal }
     ]);
   }
 
-  /* --------------------------- настройки AI --------------------------- */
+  /* --------------------------- действия по запросу --------------------------- */
+  async function actSend(id) {
+    try {
+      var res = await Api.send(id);
+      renderRequests();
+      var note = res.detail || 'Готово';
+      toast(note, res.ok === false ? 'warn' : 'ok', 7000);
+      if (res.dry_run) {
+        /* Письмо не ушло (DRY_RUN или отправка через форму) — сразу показываем текст,
+           чтобы его можно было скопировать и отправить из своей почты. */
+        await showLetter(id);
+      }
+      if (state.demo) state.demo = null;
+    } catch (e) { toast('Не удалось отправить: ' + e.message, 'bad', 7000); }
+  }
+
+  async function actStatus(id, status) {
+    try {
+      await Api.setStatus(id, status);
+      renderRequests();
+      toast('Статус: ' + (STATUS_LABELS[status] || status));
+      if (state.demo) state.demo = null;
+    } catch (e) { toast('Не удалось изменить статус: ' + e.message, 'bad', 7000); }
+  }
+
+  async function actNote(id) {
+    var req = state.requests.filter(function (r) { return String(r.id) === String(id); })[0] || {};
+    var html = '<div class="field"><label for="note-text">Заметка к запросу</label>' +
+      '<textarea id="note-text" rows="4">' + esc(req.note || '') + '</textarea>' +
+      '<div class="help">Например: «ответили, просят скан паспорта — отказать, ст. 20 152-ФЗ».</div></div>';
+    openModal('Заметка · ' + (req.broker_name || ''), html, [
+      {
+        label: 'Сохранить', cls: 'primary', onClick: async function () {
+          try {
+            await Api.setStatus(id, null, clean($('#note-text').value));
+            closeModal(); renderRequests(); toast('Заметка сохранена');
+          } catch (e) { toast('Ошибка: ' + e.message, 'bad'); }
+        }
+      },
+      { label: 'Отмена', cls: 'ghost', onClick: closeModal }
+    ]);
+  }
+
+  async function actFollowup(id) {
+    try {
+      var res = await Api.followup(id);
+      renderRequests();
+      if (res.letter) {
+        showLetterResult('Повторное требование', res.letter, res.detail);
+      } else {
+        toast(res.detail || 'Напоминание отправлено', res.ok ? 'ok' : 'warn', 7000);
+      }
+    } catch (e) { toast('Не удалось отправить напоминание: ' + e.message, 'bad', 7000); }
+  }
+
+  async function actComplaint(id) {
+    try {
+      var res = await Api.complaint(id);
+      if (res.letter) showLetterResult('Жалоба регулятору', res.letter, res.hint);
+      else toast(res.detail || 'Жалоба собрана');
+    } catch (e) { toast('Не удалось собрать жалобу: ' + e.message, 'bad', 7000); }
+  }
+
+  async function actDelete(id) {
+    var req = state.requests.filter(function (r) { return String(r.id) === String(id); })[0] || {};
+    openModal('Удалить запрос?', '<p class="tiny">Запрос «' + esc(req.broker_name || '') + '» и его история будут удалены безвозвратно.</p>', [
+      {
+        label: 'Удалить', cls: 'danger', icon: 'trash', onClick: async function () {
+          try {
+            await Api.deleteRequest(id);
+            closeModal(); renderRequests(); toast('Запрос удалён');
+            if (state.demo) state.demo = null;
+          } catch (e) { toast('Ошибка: ' + e.message, 'bad'); }
+        }
+      },
+      { label: 'Отмена', cls: 'ghost', onClick: closeModal }
+    ]);
+  }
+
+  /* ------------------------------- автоотправка ------------------------------- */
+  async function actSendAll() {
+    try {
+      var res = await Api.bulkSend();
+      renderRequests();
+      var sentN = (res.sent || []).length, failN = (res.failed || []).length;
+      toast(res.detail || ('Отправлено: ' + sentN + ', ошибок: ' + failN), failN ? 'warn' : 'ok', 7000);
+      if (res.dry_run) toast('DRY_RUN=1: письма остались на сервере. Подключите SMTP в «Автопилоте» и выключите DRY_RUN.', 'warn', 9000);
+      if (state.demo) state.demo = null;
+    } catch (e) { toast('Ошибка отправки: ' + e.message, 'bad', 7000); }
+  }
+
+  async function actRunPilot() {
+    try {
+      var res = await Api.runAutopilot();
+      if (!res.ok && res.detail) { toast(res.detail, 'warn', 7000); return; }
+      renderPilotLog();
+      if (state.view === 'requests') renderRequests();
+      var rep = res.report || {};
+      var sent = (rep.sent || []).length, fup = (rep.followups || []).length, err = (rep.errors || []).length;
+      toast('Автопилот: отправлено ' + sent + ', напоминаний ' + fup + (err ? ', ошибок ' + err : '') + (rep.skipped ? ' · ' + rep.skipped : ''),
+        err ? 'warn' : 'ok', 8000);
+      if (state.demo) state.demo = null;
+      await renderDashboard();
+    } catch (e) { toast('Автопилот не отработал: ' + e.message, 'bad', 7000); }
+  }
+
+  /* --------------------------- настройки: почта --------------------------- */
+  function smtpPayload() {
+    var pass = $('#smtp-pass').value;
+    var smtp = {
+      host: clean($('#smtp-host').value),
+      port: Number(clean($('#smtp-port').value) || 587),
+      user: clean($('#smtp-user').value),
+      from_addr: clean($('#smtp-from').value) || clean($('#smtp-user').value),
+      from_name: clean($('#smtp-from-name').value) || 'DataCleaner',
+      use_ssl: $('#smtp-ssl').checked,
+      use_starttls: $('#smtp-starttls').checked
+    };
+    if (pass) smtp.password = pass;
+    return { smtp: smtp };
+  }
+
+  async function actSaveSmtp(silent) {
+    try {
+      var payload = smtpPayload();
+      var res = await Api.saveSettings(payload);
+      state.settings = res;
+      $('#smtp-pass').value = '';
+      renderAutopilot();
+      if (state.view === 'dashboard') paintPilotStrip();
+      if (!silent) toast('Почта сохранена' + (state.settings.resolved && state.settings.resolved.ready ? ' — автопилот готов отправлять' : ''));
+      return true;
+    } catch (e) {
+      toast('Не удалось сохранить: ' + e.message, 'bad', 7000);
+      return false;
+    }
+  }
+
+  async function actTestSmtp(sendTest) {
+    var okSave = await actSaveSmtp(true);
+    if (!okSave) return;
+    toast('Проверяю SMTP…', 'warn', 2500);
+    try {
+      var res = await Api.testSmtp({ send_test: !!sendTest, probe_to: clean($('#smtp-from').value) || null });
+      if (res.ok) toast(res.detail || 'Соединение установлено', 'ok', 8000);
+      else toast(res.detail || 'Не удалось подключиться', 'bad', 9000);
+      if (res.dry_run && sendTest) toast('DRY_RUN=1: тестовое письмо не отправлено', 'warn', 7000);
+    } catch (e) { toast('Проверка не удалась: ' + e.message, 'bad', 8000); }
+  }
+
+  async function actSavePilot() {
+    try {
+      var payload = {
+        autopilot: {
+          auto_send: $('#ap-autosend').checked,
+          followup_enabled: $('#ap-followup').checked,
+          followup_days: Math.max(1, Math.min(365, Number(clean($('#ap-days').value) || 30))),
+          interval_minutes: Math.max(5, Math.min(1440, Number(clean($('#ap-interval').value) || 15)))
+        }
+      };
+      state.settings = await Api.saveSettings(payload);
+      renderAutopilot();
+      paintPilotStrip();
+      toast('Режимы сохранены');
+      if (!(state.settings.resolved && state.settings.resolved.ready) && payload.autopilot.auto_send) {
+        toast('Автоотправка включена, но почта не подключена — письма будут копиться в «Отправлено» с пометкой об ошибке.', 'warn', 9000);
+      }
+    } catch (e) { toast('Ошибка: ' + e.message, 'bad', 7000); }
+  }
+
+  /* ---------------------------------- AI ---------------------------------- */
+  function aiContext() {
+    try {
+      var s = computeStats(state.requests, { profileFilled: Api.profileFilled() });
+      return {
+        requests_total: s.kpi.total, sent: s.kpi.sent, waiting: s.kpi.waiting,
+        overdue: s.kpi.overdue, deleted: s.kpi.deleted, refused: s.kpi.refused,
+        drafts: s.kpi.drafts, deletion_rate: s.kpi.deletion_rate,
+        avg_response_days: s.kpi.avg_response_days,
+        categories: s.categories || s.by_category || []
+      };
+    } catch (e) { return null; }
+  }
+
+  function pushChat(role, content) {
+    var msg = { role: role, content: content, streaming: false };
+    state.chat.push(msg);
+    renderAI();
+    return msg;
+  }
+
+  function chatHistory() {
+    return state.chat
+      .filter(function (m) { return m.role === 'user' || (m.role === 'assistant' && !m.streaming); })
+      .map(function (m) { return { role: m.role, content: m.content }; });
+  }
+
+  function abortAi() {
+    if (state.abort) { try { state.abort.abort(); } catch (e) { /* ignore */ } }
+    state.abort = null;
+    state.aiStreaming = false;
+  }
+
+  async function askStream(question) {
+    var kinds = detectPII(question);
+    if (kinds.length) { pushChat('system', piiWarning(kinds)); return; }
+
+    pushChat('user', question);
+    var botMsg = pushChat('assistant', '');
+    botMsg.streaming = true;
+    state.aiStreaming = true;
+    renderAI();
+
+    if (!state.server) {
+      var res = await Api.ask(question, chatHistory().slice(0, -2));
+      botMsg.streaming = false;
+      state.aiStreaming = false;
+      if (res.ok) {
+        botMsg.content = res.answer;
+      } else {
+        state.chat = state.chat.filter(function (m) { return m !== botMsg; });
+        pushChat('system', res.notConfigured ? (res.hint || 'AI не настроен') : (res.message || 'Не удалось получить ответ'));
+      }
+      Store.set(K.chat, state.chat.slice(-40));
+      renderAI();
+      return;
+    }
+
+    var ctrl = new AbortController();
+    state.abort = ctrl;
+    var timer = setTimeout(function () { ctrl.abort(); }, 120000);
+    try {
+      var resp = await fetch('api/assistant/stream', {
+        method: 'POST',
+        headers: Object.assign({ 'Content-Type': 'application/json' },
+          accessToken() ? { 'X-Access-Token': accessToken() } : {}),
+        body: JSON.stringify({ question: question, history: chatHistory().slice(0, -2), mode: state.aiMode, context: aiContext() }),
+        signal: ctrl.signal
+      });
+      if (resp.status === 401) { abortAi(); showAccessModal(); return; }
+      if (!resp.ok || !resp.body) {
+        var txt = '';
+        try { txt = await resp.text(); } catch (e) { /* ignore */ }
+        throw new Error('HTTP ' + resp.status + (txt ? ' · ' + txt.slice(0, 140) : ''));
+      }
+      var reader = resp.body.getReader();
+      var decoder = new TextDecoder();
+      var buffer = '';
+      while (true) {
+        var chunk = await reader.read();
+        if (chunk.done) break;
+        buffer += decoder.decode(chunk.value, { stream: true });
+        var parts = buffer.split('\n\n');
+        buffer = parts.pop();
+        for (var i = 0; i < parts.length; i++) {
+          var line = parts[i].trim();
+          if (line.indexOf('data:') !== 0) continue;
+          var obj = null;
+          try { obj = JSON.parse(line.slice(5).trim()); } catch (e) { continue; }
+          if (obj.delta) { botMsg.content += obj.delta; renderAI(); }
+          else if (obj.blocked) { botMsg.content = obj.warning || 'Запрос заблокирован PII-фильтром.'; }
+          else if (obj.not_configured) { botMsg.content = obj.hint || 'AI не настроен на сервере.'; }
+          else if (obj.error_body || obj.error) {
+            botMsg.content = (obj.error_body && (obj.error_body.message || obj.error_body)) || obj.message || 'Ошибка AI-провайдера.';
+            if (typeof botMsg.content !== 'string') botMsg.content = JSON.stringify(botMsg.content);
+          } else if (obj.done && obj.cached) { /* кэш сервера */ }
+        }
+      }
+      botMsg.streaming = false;
+      if (!botMsg.content) botMsg.content = 'Модель вернула пустой ответ. Попробуйте переформулировать вопрос.';
+      state.aiStreaming = false;
+      state.abort = null;
+      Store.set(K.chat, state.chat.slice(-40));
+      renderAI();
+    } catch (err) {
+      clearTimeout(timer);
+      botMsg.streaming = false;
+      state.aiStreaming = false;
+      state.abort = null;
+      if (err && err.name === 'AbortError') {
+        if (!botMsg.content) botMsg.content = 'Запрос отменён.';
+      } else {
+        botMsg.content = botMsg.content || ('Ошибка: ' + (err.message || 'неизвестная'));
+      }
+      renderAI();
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   function openAiSettingsModal() {
     if (state.server) {
-      openModal('Настройки AI',
-        '<p class="tiny">В серверном режиме ключ задаётся только переменными окружения на сервере — в браузер он не попадает.</p>' +
-        '<div class="letter" style="max-height:none">LLM_API_KEY=&lt;ключ провайдера&gt;\nLLM_BASE_URL=' +
-        esc(state.llmServer.base_url_host ? 'https://' + state.llmServer.base_url_host + '/v1' : 'https://tokenlavka.com/v1') +
-        '\nLLM_MODEL=' + esc(state.llmServer.model || 'gpt-6-luna') + '</div>' +
-        '<p class="tiny">После правки .env перезапустите uvicorn. Ключ из браузера не используется вообще.</p>',
+      openModal('AI на сервере', '<div class="banner info" style="margin:0">' + ICONS.info +
+        '<div>В серверном режиме ключ AI задаётся переменными окружения <span class="code">LLM_BASE_URL</span>, ' +
+        '<span class="code">LLM_API_KEY</span>, <span class="code">LLM_MODEL</span> — и в браузер не попадает. ' +
+        'Измените их в панели хостинга (Render → Environment) и перезапустите сервис.</div></div>' +
+        '<div class="kv" style="margin-top:12px"><dt>Статус</dt><dd>' + (state.llmServer.configured ? 'подключён' : 'не настроен') + '</dd>' +
+        '<dt>Модель</dt><dd>' + esc(state.llmServer.model || '—') + '</dd>' +
+        '<dt>Провайдер</dt><dd>' + esc(state.llmServer.base_url_host || '—') + '</dd></div>',
         [{ label: 'Понятно', cls: 'primary', onClick: closeModal }]);
       return;
     }
-    var cfg = state.llm || {};
-    var html = '<div class="banner">' + ICONS.warn +
-      '<div>Ключ хранится в localStorage этого браузера и уходит напрямую провайдеру. На чужом устройстве не сохраняйте ключ. Для продукта используйте серверный режим: там ключ не покидает сервер.</div></div>' +
-      '<div class="field"><label for="llm-base">Base URL</label>' +
-      '<input id="llm-base" type="text" placeholder="https://tokenlavka.com/v1" value="' + esc(cfg.base_url || '') + '">' +
-      '<div class="help">OpenAI-совместимый адрес. Запрос уйдёт на {Base URL}/chat/completions.</div></div>' +
+    var html = '<div class="field"><label for="llm-base">Base URL (OpenAI-совместимый)</label>' +
+      '<input id="llm-base" type="text" value="' + esc(state.llm.base_url || '') + '" placeholder="https://provider.com/v1"></div>' +
       '<div class="field"><label for="llm-key">API-ключ</label>' +
-      '<input id="llm-key" type="password" placeholder="sk-..." value="' + esc(cfg.api_key || '') + '"></div>' +
+      '<input id="llm-key" type="password" value="' + esc(state.llm.api_key || '') + '" placeholder="sk-...">' +
+      '<div class="help">Ключ хранится только в localStorage этого браузера и уходит напрямую провайдеру.</div></div>' +
       '<div class="field"><label for="llm-model">Модель</label>' +
-      '<input id="llm-model" type="text" placeholder="gpt-6-luna" value="' + esc(cfg.model || '') + '">' +
-      '<div class="help">Точный ID модели из документации провайдера.</div></div>';
+      '<input id="llm-model" type="text" value="' + esc(state.llm.model || '') + '" placeholder="gpt-6-luna"></div>' +
+      '<div class="banner info" style="margin:0">' + ICONS.info +
+      '<div>Если провайдер не разрешает CORS, запрос из браузера не пройдёт — используйте серверную версию DataCleaner.</div></div>';
     openModal('Настройки AI', html, [
-      { label: 'Отмена', cls: 'ghost', onClick: closeModal },
       {
-        label: 'Сохранить', cls: 'primary', icon: 'check', onClick: async function () {
-          await Api.saveLlm({
-            base_url: clean($('#llm-base').value),
-            api_key: clean($('#llm-key').value),
-            model: clean($('#llm-model').value)
-          });
-          closeModal();
-          renderAI();
-          toast('Настройки AI сохранены');
+        label: 'Сохранить', cls: 'primary', onClick: async function () {
+          try {
+            await Api.saveLlm({
+              base_url: clean($('#llm-base').value),
+              api_key: clean($('#llm-key').value),
+              model: clean($('#llm-model').value)
+            });
+            closeModal(); renderAI(); refreshModels(true);
+            toast('Настройки AI сохранены');
+          } catch (e) { toast('Ошибка: ' + e.message, 'bad'); }
         }
-      }
+      },
+      { label: 'Отмена', cls: 'ghost', onClick: closeModal }
     ]);
   }
 
-  /* ---------------------------- полная очистка ---------------------------- */
-  function openWipeModal() {
-    var html = '<div class="banner">' + ICONS.warn +
-      '<div>Это необратимо: ' +
-      (state.server
-        ? 'будут удалены профиль, все запросы, история изменений и ваши сервисы в базе SQLite.'
-        : 'будет очищен localStorage: профиль, запросы, история, свои сервисы и история чата.') +
-      '</div></div>' +
-      '<div class="field"><label for="wipe-confirm">Введите DELETE, чтобы подтвердить</label>' +
+  async function refreshModels(silent) {
+    try {
+      var res = await Api.models();
+      if (!(res && res.models && res.models.length) && !silent) {
+        toast('Список моделей недоступен: ' + ((res && res.detail) || 'AI не настроен'), 'warn', 6000);
+      }
+      renderAI();
+    } catch (e) { if (!silent) toast('Модели: ' + e.message, 'warn'); }
+  }
+
+  /* -------------------------------- профиль -------------------------------- */
+  function readProfileForm() {
+    return {
+      full_name: clean($('#pf-name').value),
+      emails: listOf($('#pf-emails').value),
+      phones: listOf($('#pf-phones').value),
+      city: clean($('#pf-city').value),
+      birth_year: clean($('#pf-birth').value),
+      address: clean($('#pf-address').value),
+      language: $('#pf-lang').value
+    };
+  }
+
+  async function actSaveProfile(previewOnly) {
+    var p = readProfileForm();
+    if (p.birth_year && !/^\d{4}$/.test(p.birth_year)) { toast('Год рождения — четыре цифры', 'warn'); return; }
+    if (p.emails.length) {
+      var bad = p.emails.filter(function (e) { return !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e); });
+      if (bad.length) { toast('Похоже на ошибку в email: ' + bad[0], 'warn', 6000); return; }
+    }
+    if (previewOnly) { state.profile = p; renderProfilePreview(p); return; }
+    try {
+      var res = await Api.saveProfile(p);
+      state.profile = p;
+      state.profileUpdated = new Date().toISOString();
+      renderProfile();
+      toast(res.detail || 'Профиль сохранён');
+    } catch (e) { toast('Не удалось сохранить: ' + e.message, 'bad', 7000); }
+  }
+
+  async function actExport(copy) {
+    try {
+      var data = await Api.exportData();
+      if (copy) {
+        var ok = await copyText(JSON.stringify(data, null, 2));
+        toast(ok ? 'JSON скопирован в буфер' : 'Не удалось скопировать', ok ? 'ok' : 'warn');
+        return;
+      }
+      var stamp = isoDay(todayDate());
+      download('datacleaner-export-' + stamp + '.json', JSON.stringify(data, null, 2), 'application/json');
+      toast('Файл экспорта сохранён. В нём персональные данные — храните аккуратно.', 'warn', 8000);
+    } catch (e) { toast('Экспорт не удался: ' + e.message, 'bad', 7000); }
+  }
+
+  function actWipe() {
+    var html = '<div class="banner info" style="margin:0">' + ICONS.warn +
+      '<div>Будут удалены: профиль, все запросы с письмами и историей, свои сервисы, чат с AI. ' +
+      (state.server ? 'Данные в базе SQLite на сервере.' : 'Данные в localStorage этого браузера.') +
+      ' Отменить это нельзя.</div></div>' +
+      '<div class="field" style="margin-top:14px"><label for="wipe-confirm">Введите DELETE для подтверждения</label>' +
       '<input id="wipe-confirm" type="text" placeholder="DELETE" autocomplete="off"></div>';
     openModal('Удалить все данные?', html, [
-      { label: 'Отмена', cls: 'ghost', onClick: closeModal },
       {
-        label: 'Удалить всё', cls: 'danger', icon: 'trash', onClick: async function (btn) {
-          if (clean($('#wipe-confirm').value).toUpperCase() !== 'DELETE') {
-            toast('Введите DELETE для подтверждения', 'warn');
-            return;
-          }
-          btn.disabled = true;
+        label: 'Удалить навсегда', cls: 'danger', icon: 'trash', onClick: async function () {
+          if (clean($('#wipe-confirm').value).toUpperCase() !== 'DELETE') { toast('Введите DELETE', 'warn'); return; }
           try {
             var res = await Api.wipe();
             closeModal();
-            await refreshAll();
-            renderProfile();
-            renderAI();
+            state.demo = null;
+            state.chat = [];
+            state.settings = await Api.getSettings().catch(function () { return state.settings; });
+            renderProfile(); renderRequests(); renderCatalog(); renderAI();
+            await renderDashboard();
             toast(res.detail || 'Все данные удалены');
-          } catch (e) {
-            toast('Ошибка: ' + e.message, 'bad');
-          } finally { btn.disabled = false; }
+          } catch (e) { toast('Ошибка очистки: ' + e.message, 'bad', 7000); }
+        }
+      },
+      { label: 'Отмена', cls: 'ghost', onClick: closeModal }
+    ]);
+  }
+
+  /* ------------------------------ код доступа ------------------------------ */
+  function showAccessModal() {
+    var html = '<div class="banner info" style="margin:0">' + ICONS.info +
+      '<div>Сервер защищён кодом доступа (ACCESS_TOKEN). Он хранится только в этом браузере.</div></div>' +
+      '<div class="field" style="margin-top:14px"><label for="access-code">Код доступа</label>' +
+      '<input id="access-code" type="password" placeholder="dc-…" autocomplete="off" autofocus></div>';
+    openModal('Нужен код доступа', html, [
+      {
+        label: 'Войти', cls: 'primary', onClick: function () {
+          var code = clean($('#access-code').value);
+          if (!code) { toast('Введите код', 'warn'); return; }
+          Store.set(K.token, code);
+          closeModal();
+          boot();
         }
       }
     ]);
   }
 
-  /* ============================= САМОПРОВЕРКА ============================= */
+  /* ------------------------------ самопроверка ------------------------------ */
   function selfTest() {
     var results = [];
     function check(name, fn) {
@@ -344,6 +691,24 @@
       var l = buildEnLetter({}, enBroker);
       if (/undefined|NaN/.test(l.body + l.subject)) return 'в письме есть undefined/NaN';
       if (l.body.indexOf('a data subject') === -1) return 'нет подстановки «a data subject»';
+      return true;
+    });
+
+    check('Повторное требование ссылается на истёкший срок', function () {
+      var f = buildFollowup(fullProfile, ruBroker, 'ru', new Date(2026, 10, 8), '2026-09-01T10:00:00Z');
+      if (f.subject.indexOf('Повторное') === -1) return 'нет пометки «Повторное»';
+      if (f.body.indexOf('21 152-ФЗ') === -1) return 'нет ссылки на ст. 21 152-ФЗ';
+      if (f.body.indexOf('30 дней') === -1) return 'нет срока 30 дней';
+      if (f.body.indexOf('2026-09-01') === -1) return 'не подставлена дата первого требования';
+      if (/undefined|NaN/.test(f.body)) return 'undefined/NaN в тексте';
+      return true;
+    });
+
+    check('Жалоба в Роскомнадзор собирается без AI', function () {
+      var c = buildLocalComplaint(fullProfile, { broker_name: 'Spokeo', sent_at: '2026-09-01T10:00:00Z', language: 'ru' });
+      if (c.body.indexOf('Роскомнадзор') === -1) return 'нет адресата';
+      if (c.body.indexOf('13.11') === -1) return 'нет статьи КоАП';
+      if (/undefined|NaN/.test(c.body)) return 'undefined/NaN в тексте';
       return true;
     });
 
@@ -459,34 +824,49 @@
     var passed = results.filter(function (r) { return r.pass; }).length;
     var html = '<div class="pill ' + (passed === results.length ? 'ok' : 'bad') + '" style="margin-bottom:12px">' +
       passed + ' из ' + results.length + ' проверок пройдено</div>' +
-      '<div class="self-test-result">' + results.map(function (r) {
-        return '<div class="tr ' + (r.pass ? 'pass' : 'fail') + '"><span class="st">' + (r.pass ? 'OK' : 'FAIL') + '</span>' +
-          '<div><div>' + esc(r.name) + '</div>' +
-          (r.pass ? '' : '<div class="detail">' + esc(r.detail) + '</div>') + '</div></div>';
+      '<div class="stack" style="gap:8px;max-height:52vh;overflow:auto">' + results.map(function (r) {
+        return '<div class="dl"><span class="pill ' + (r.pass ? 'ok' : 'bad') + '">' + (r.pass ? 'OK' : 'FAIL') + '</span>' +
+          '<span class="nm" style="white-space:normal">' + esc(r.name) +
+          (r.pass ? '' : '<br><span style="color:#fda4af">' + esc(r.detail) + '</span>') + '</span></div>';
       }).join('') + '</div>' +
-      '<p class="tiny" style="margin-top:12px">Проверяются тексты писем (152-ФЗ, GDPR, CCPA), пустые поля, PII-фильтр, KPI и воронка, дедлайн 30 дней, серия активности, переходы статусов, экранирование HTML и хранилище.</p>';
+      '<p class="tiny" style="margin-top:12px">Проверяются тексты писем (152-ФЗ, GDPR, CCPA), повторное требование и жалоба, ' +
+      'пустые поля, PII-фильтр, KPI и воронка, дедлайн 30 дней, серия активности, переходы статусов, экранирование HTML и хранилище.</p>';
     openModal('Самопроверка логики', html, [{ label: 'Закрыть', cls: 'primary', onClick: closeModal }]);
     if (passed === results.length) toast('Самопроверка: все ' + results.length + ' проверок пройдены', 'ok');
     else toast('Самопроверка: ошибок — ' + (results.length - passed), 'bad', 6000);
   }
 
   /* ============================== ОБНОВЛЕНИЕ ============================== */
-  async function refreshAll() {
+  async function refreshData() {
     if (state.server) {
       var rq = await http('GET', 'api/requests');
       state.requests = (rq && rq.items) || [];
     } else {
       state.requests = localRequests();
     }
-    if (state.view === 'dashboard') renderDashboard();
-    if (state.view === 'requests') renderRequests();
-    if (state.view === 'catalog') renderCatalog();
-    if (state.view === 'data') renderData();
+    renderRequests();
+    renderCatalog();
+  }
+
+  function renderBadge() {
+    var badge = $('#mode-badge');
+    if (!badge) return;
+    var ready = state.settings && state.settings.resolved && state.settings.resolved.ready;
+    badge.classList.toggle('live', !!state.server);
+    badge.innerHTML = '<span class="dot"></span><span class="txt">' +
+      (state.server ? ('сервер · ' + (ready ? 'почта ок' : 'без почты')) : 'локальный режим') + '</span>';
+    badge.title = state.server
+      ? 'Серверная версия: FastAPI + SQLite, автоотправка доступна'
+      : 'Браузерный режим: данные в localStorage, письма отправляются вами';
   }
 
   /* ================================ СОБЫТИЯ ================================ */
   function bind() {
     $('#nav').addEventListener('click', function (e) {
+      var btn = e.target.closest('button[data-view]');
+      if (btn) navigate(btn.dataset.view);
+    });
+    $('#bottom-nav').addEventListener('click', function (e) {
       var btn = e.target.closest('button[data-view]');
       if (btn) navigate(btn.dataset.view);
     });
@@ -505,96 +885,52 @@
         if (state.view !== 'dashboard') navigate('dashboard');
         paintDashboard(state.demo);
         toast('Загружена демо-статистика: данные не сохранены');
-      } catch (e) {
-        toast('Не удалось загрузить демо: ' + e.message, 'bad');
-      }
+      } catch (e) { toast('Не удалось загрузить демо: ' + e.message, 'bad'); }
     });
 
-    $('#btn-new-request').addEventListener('click', openNewRequestModal);
-    $('#btn-new-request-2').addEventListener('click', openNewRequestModal);
-    $('#btn-add-broker').addEventListener('click', openAddBrokerModal);
-
-    $('#profile-form').addEventListener('submit', async function (e) {
-      e.preventDefault();
-      var p = {
-        full_name: clean($('#pf-name').value),
-        emails: listOf($('#pf-emails').value),
-        phones: listOf($('#pf-phones').value),
-        city: clean($('#pf-city').value),
-        birth_year: clean($('#pf-birth').value),
-        address: clean($('#pf-address').value),
-        language: $('#pf-lang').value
-      };
-      if (p.birth_year && !/^\d{4}$/.test(p.birth_year)) { toast('Год рождения — четыре цифры', 'warn'); return; }
-      try {
-        var res = await Api.saveProfile(p);
-        renderProfile();
-        toast(res.detail || 'Профиль сохранён');
-      } catch (err) {
-        toast('Ошибка сохранения: ' + err.message, 'bad', 6000);
-      }
-    });
-
-    ['#pf-name', '#pf-emails', '#pf-phones', '#pf-city', '#pf-birth', '#pf-address'].forEach(function (sel) {
+    ['#btn-new-request-top', '#btn-new-request', '#btn-new-request-2'].forEach(function (sel) {
       var el = $(sel);
-      if (el) el.addEventListener('input', function () {
-        renderProfilePreview({
-          full_name: $('#pf-name').value, emails: $('#pf-emails').value, phones: $('#pf-phones').value,
-          city: $('#pf-city').value, birth_year: $('#pf-birth').value, address: $('#pf-address').value
-        });
-      });
+      if (el) el.addEventListener('click', openNewRequestModal);
     });
+    $('#btn-add-broker').addEventListener('click', openAddBrokerModal);
+    $('#btn-send-all').addEventListener('click', actSendAll);
 
-    $('#btn-profile-clear').addEventListener('click', function () {
-      ['#pf-name', '#pf-emails', '#pf-phones', '#pf-city', '#pf-birth', '#pf-address'].forEach(function (s) { $(s).value = ''; });
-      renderProfilePreview({});
-      toast('Форма очищена — сохранённый профиль не изменился', 'warn', 5000);
+    $('#status-filters').addEventListener('click', function (e) {
+      var btn = e.target.closest('button[data-status]');
+      if (!btn) return;
+      state.filterStatus = btn.dataset.status;
+      $$('#status-filters .chip').forEach(function (c) { c.classList.toggle('active', c === btn); });
+      renderRequests();
     });
 
     $('#cat-filters').addEventListener('click', function (e) {
-      var chip = e.target.closest('.chip');
-      if (!chip) return;
-      state.filterCat = chip.dataset.cat;
-      $$('#cat-filters .chip').forEach(function (c) { c.classList.toggle('active', c === chip); });
+      var btn = e.target.closest('button[data-cat]');
+      if (!btn) return;
+      state.filterCat = btn.dataset.cat;
+      $$('#cat-filters .chip').forEach(function (c) { c.classList.toggle('active', c === btn); });
       renderCatalog();
-    });
-
-    $('#status-filters').addEventListener('click', function (e) {
-      var chip = e.target.closest('.chip');
-      if (!chip) return;
-      state.filterStatus = chip.dataset.status;
-      $$('#status-filters .chip').forEach(function (c) { c.classList.toggle('active', c === chip); });
-      renderRequests();
     });
 
     $('#broker-list').addEventListener('click', async function (e) {
       var btn = e.target.closest('button[data-act]');
       if (!btn) return;
-      var act = btn.dataset.act;
-      try {
-        if (act === 'create') {
-          btn.disabled = true;
+      if (btn.dataset.act === 'create') {
+        try {
           var res = await Api.createRequest(btn.dataset.broker, null);
-          await refreshAll();
-          toast('Черновик создан');
-          var full = await Api.getRequestFull(res.request.id);
-          openLetterModal(full.request, full.letter, full.events || []);
-        }
-        if (act === 'del-broker') {
-          if (!confirm('Удалить этот сервис из каталога?')) return;
+          renderCatalog(); renderRequests();
+          toast('Запрос создан');
+          await showLetter(res.request.id);
+          if (state.settings && state.settings.autopilot && state.settings.autopilot.auto_send) {
+            toast('Автоотправка включена: черновик уйдёт на следующем цикле автопилота', 'warn', 7000);
+          }
+        } catch (err) { toast('Ошибка: ' + err.message, 'bad', 6000); }
+      }
+      if (btn.dataset.act === 'goto-request') navigate('requests');
+      if (btn.dataset.act === 'del-broker') {
+        try {
           await Api.deleteBroker(btn.dataset.broker);
-          renderCatalog();
-          toast('Сервис удалён');
-        }
-        if (act === 'goto-request') {
-          state.filterStatus = 'all';
-          $$('#status-filters .chip').forEach(function (c) { c.classList.toggle('active', c.dataset.status === 'all'); });
-          navigate('requests');
-        }
-      } catch (err) {
-        toast('Ошибка: ' + err.message, 'bad');
-      } finally {
-        btn.disabled = false;
+          renderCatalog(); toast('Сервис удалён из каталога');
+        } catch (err) { toast('Ошибка: ' + err.message, 'bad'); }
       }
     });
 
@@ -603,188 +939,126 @@
       if (!btn) return;
       var id = btn.dataset.id;
       var act = btn.dataset.act;
-      var req = state.requests.filter(function (r) { return String(r.id) === String(id); })[0];
-      if (!req) return;
-      try {
-        if (act === 'view') {
-          var full = await Api.getRequestFull(id);
-          openLetterModal(full.request, full.letter, full.events || []);
-        }
-        if (act === 'send') {
-          btn.disabled = true;
-          var res = await Api.send(id);
-          await refreshAll();
-          toast(res.detail || 'Готово', res.ok === false ? 'bad' : 'ok', 7000);
-          if (res.ok !== false && req.method === 'email' && req.to_email) {
-            var full2 = await Api.getRequestFull(id);
-            openLetterModal(full2.request, full2.letter, full2.events || []);
-          }
-        }
-        if (act === 'status') {
-          var target = btn.dataset.status;
-          if (target === 'draft' && !confirm('Вернуть запрос в черновик для повторной отправки?')) return;
-          await Api.setStatus(id, target, null);
-          await refreshAll();
-          toast('Статус: ' + (STATUS_LABELS[target] || target));
-        }
-        if (act === 'note') openNoteModal(req);
-        if (act === 'del') {
-          if (!confirm('Удалить запрос и его историю?')) return;
-          await Api.deleteRequest(id);
-          await refreshAll();
-          toast('Запрос удалён');
-        }
-      } catch (err) {
-        toast('Ошибка: ' + err.message, 'bad', 6000);
-      } finally {
-        btn.disabled = false;
-      }
+      if (act === 'send') actSend(id);
+      else if (act === 'status') actStatus(id, btn.dataset.status);
+      else if (act === 'view') showLetter(id);
+      else if (act === 'note') actNote(id);
+      else if (act === 'followup') actFollowup(id);
+      else if (act === 'complaint') actComplaint(id);
+      else if (act === 'del') actDelete(id);
     });
 
-    $('#btn-ai-send').addEventListener('click', sendChat);
+    $('#pilot-toggle').addEventListener('change', async function () {
+      var on = this.checked;
+      try {
+        state.settings = await Api.saveSettings({ autopilot: Object.assign({}, state.settings.autopilot, { auto_send: on }) });
+        paintPilotStrip();
+        renderAutopilot();
+        toast(on ? 'Автоотправка включена' : 'Автоотправка выключена');
+      } catch (e) { toast('Ошибка: ' + e.message, 'bad'); this.checked = !on; }
+    });
+    $('#pilot-run').addEventListener('click', actRunPilot);
+    $('#pilot-open').addEventListener('click', function () { navigate('autopilot'); });
+
+    $('#smtp-save').addEventListener('click', function () { actSaveSmtp(false); });
+    $('#smtp-test').addEventListener('click', function () { actTestSmtp(false); });
+    $('#smtp-test-send').addEventListener('click', function () { actTestSmtp(true); });
+    $('#ap-save').addEventListener('click', actSavePilot);
+    $('#ap-run').addEventListener('click', actRunPilot);
+
+    $('#ai-modes').addEventListener('click', function (e) {
+      var btn = e.target.closest('.chip[data-mode]');
+      if (!btn) return;
+      state.aiMode = btn.dataset.mode;
+      $$('#ai-modes .chip').forEach(function (c) { c.classList.toggle('active', c === btn); });
+    });
+    $$('#view-ai .chip[data-q]').forEach(function (chip) {
+      chip.addEventListener('click', function () {
+        $('#chat-input').value = chip.dataset.q;
+        $('#chat-input').focus();
+      });
+    });
+    $('#btn-ai-send').addEventListener('click', function () {
+      if (state.aiStreaming) { abortAi(); toast('Запрос остановлен', 'warn'); return; }
+      var q = clean($('#chat-input').value);
+      if (!q) { toast('Напишите вопрос', 'warn'); return; }
+      $('#chat-input').value = '';
+      askStream(q);
+    });
     $('#chat-input').addEventListener('keydown', function (e) {
-      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); sendChat(); }
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('#btn-ai-send').click(); }
     });
-    $('#view-ai').addEventListener('click', function (e) {
-      var chip = e.target.closest('.chip[data-q]');
-      if (chip) { $('#chat-input').value = chip.dataset.q; sendChat(); }
-    });
-    $('#btn-ai-settings').addEventListener('click', openAiSettingsModal);
     $('#btn-ai-clear').addEventListener('click', function () {
+      abortAi();
       state.chat = [];
       Store.set(K.chat, []);
       renderAI();
-      toast('История чата очищена');
+      toast('Чат очищен');
+    });
+    $('#btn-ai-settings').addEventListener('click', openAiSettingsModal);
+    $('#btn-models-refresh').addEventListener('click', function () { refreshModels(false); });
+    $('#ai-model').addEventListener('change', async function () {
+      if (state.server) return;
+      await Api.saveLlm({ model: this.value });
+      renderAI();
+      toast('Модель: ' + this.value);
     });
 
-    $('#btn-export').addEventListener('click', async function () {
-      try {
-        var data = await Api.exportData();
-        var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-        var a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = 'datacleaner-export-' + isoDay(todayDate()) + '.json';
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
-        toast('Экспорт скачан. В файле ваши ПД — храните его аккуратно', 'warn', 7000);
-      } catch (e) {
-        toast('Ошибка экспорта: ' + e.message, 'bad');
+    $('#profile-form').addEventListener('submit', function (e) { e.preventDefault(); actSaveProfile(false); });
+    ['#pf-name', '#pf-emails', '#pf-phones', '#pf-city', '#pf-birth', '#pf-address'].forEach(function (sel) {
+      var el = $(sel);
+      if (el) el.addEventListener('input', function () { actSaveProfile(true); });
+    });
+    $('#pf-lang').addEventListener('change', function () { actSaveProfile(true); });
+    $('#btn-profile-clear').addEventListener('click', function () {
+      ['#pf-name', '#pf-emails', '#pf-phones', '#pf-city', '#pf-birth', '#pf-address'].forEach(function (sel) { $(sel).value = ''; });
+      actSaveProfile(true);
+      toast('Форма очищена (профиль на сервере не тронут — нажмите «Сохранить»)');
+    });
+    $('#btn-export').addEventListener('click', function () { actExport(false); });
+    $('#btn-backup').addEventListener('click', function () { actExport(true); });
+    $('#btn-wipe').addEventListener('click', actWipe);
+
+    window.addEventListener('resize', function () {
+      if (state.view === 'dashboard') {
+        clearTimeout(window.__dcResize);
+        window.__dcResize = setTimeout(function () { renderDashboard(); }, 220);
       }
     });
-
-    $('#btn-backup').addEventListener('click', async function () {
-      try {
-        var data = await Api.exportData();
-        var ok = await copyText(JSON.stringify(data, null, 2));
-        toast(ok ? 'JSON скопирован в буфер' : 'Не удалось скопировать (возможно, большой объём)', ok ? 'ok' : 'warn');
-      } catch (e) {
-        toast('Ошибка: ' + e.message, 'bad');
-      }
-    });
-
-    $('#btn-wipe').addEventListener('click', openWipeModal);
   }
 
-  /* ================================= ЗАПУСК ================================= */
-  /* Код доступа: сервер вернул 401 с флагом auth_required */
-  function askAccessToken(message) {
-    var html = '<div class="banner">' + ICONS.warn +
-      '<div>Этот сервер защищён кодом доступа: он закрывает API от посторонних.' +
-      (message ? ' <br>' + esc(message) : '') + '</div></div>' +
-      '<div class="field"><label for="access-code">Код доступа</label>' +
-      '<input id="access-code" type="password" placeholder="ACCESS_TOKEN" autocomplete="off" autofocus>' +
-      '<div class="help">Значение переменной окружения ACCESS_TOKEN на сервере. Хранится только в этом браузере.</div></div>';
-    openModal('Нужен код доступа', html, [
-      {
-        label: 'Подключиться', cls: 'primary', icon: 'check', onClick: async function (btn) {
-          var code = clean($('#access-code').value);
-          if (!code) { toast('Введите код доступа', 'warn'); return; }
-          Store.set(K.token, code);
-          btn.disabled = true;
-          closeModal();
-          try {
-            await Api.init();
-            attachBadge();
-            renderProfile(); renderAI(); renderCatalog(); renderRequests(); renderData();
-            await renderDashboard();
-            toast('Подключено к серверу');
-          } catch (e) {
-            if (e.authRequired) {
-              Store.del(K.token);
-              toast('Код не подошёл', 'bad');
-              askAccessToken('Код не подошёл, попробуйте снова.');
-            } else {
-              toast('Ошибка: ' + e.message, 'bad', 8000);
-            }
-          } finally { btn.disabled = false; }
-        }
-      },
-      {
-        label: 'Работать локально', cls: 'ghost', onClick: function () {
-          Store.del(K.token);
-          state.server = false;
-          state.brokers = BUILTIN_BROKERS.slice();
-          state.requests = localRequests();
-          state.profile = Store.get(K.profile, {}) || {};
-          closeModal();
-          attachBadge();
-          renderProfile(); renderAI(); renderCatalog(); renderRequests(); renderData();
-          renderDashboard();
-          toast('Режим LOCAL: данные в этом браузере', 'warn', 6000);
-        }
-      }
-    ]);
-  }
-
-  function attachBadge() {
-    var badge = $('#mode-badge');
-    badge.textContent = state.server ? 'server' : 'local';
-    badge.classList.toggle('server', state.server);
-    badge.title = state.server
-      ? 'Подключено к FastAPI: данные в SQLite, зашифрованы Fernet'
-      : 'Автономный режим: данные в localStorage вашего браузера';
-  }
-
+  /* ================================ ЗАПУСК ================================ */
   async function boot() {
-    bind();
-    var needsToken = false;
     try {
       await Api.init();
     } catch (e) {
-      if (e && e.authRequired) {
-        needsToken = true;
-      } else {
-        console.error(e);
-        toast('Ошибка инициализации: ' + e.message, 'bad', 8000);
-      }
+      if (e && e.authRequired) { showAccessModal(); return; }
+      toast('Ошибка загрузки: ' + e.message, 'bad', 8000);
     }
-    if (needsToken) {
-      state.server = true;
-      attachBadge();
-      askAccessToken('');
-      return;
+    renderBadge();
+    refreshModels(true);
+    renderRequests();
+    renderCatalog();
+    renderAutopilot();
+    renderProfile();
+    renderAI();
+    await renderDashboard();
+    navigate(state.view || 'dashboard');
+    if (!state.profile.full_name) {
+      setTimeout(function () {
+        toast('Заполните профиль — без ФИО и email оператор не сможет вас идентифицировать', 'warn', 7000);
+      }, 900);
     }
-    attachBadge();
-
-    if (!storageOK && !state.server) {
-      toast('localStorage недоступен: данные будут потеряны после перезагрузки', 'warn', 9000);
-    }
-    try {
-      renderProfile();
-      renderAI();
-      renderCatalog();
-      renderRequests();
-      renderData();
-      await renderDashboard();
-    } catch (e) {
-      console.error(e);
-      toast('Ошибка отрисовки: ' + e.message, 'bad', 8000);
+    if (state.server && state.serverMeta && state.serverMeta.dry_run) {
+      setTimeout(function () {
+        toast('DRY_RUN=1: письма не уходят. Подключите SMTP в «Автопилоте», чтобы отправлять по-настоящему.', 'warn', 9000);
+      }, 1800);
     }
   }
 
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
-  else boot();
+  document.addEventListener('DOMContentLoaded', function () {
+    try { bind(); } catch (e) { console.error('bind', e); }
+    boot();
+  });
 
 })();

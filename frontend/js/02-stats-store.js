@@ -114,6 +114,80 @@
     };
   }
 
+  /* ------------------- локальные напоминание и жалоба ------------------- */
+  function buildFollowup(profile, broker, language, today, original) {
+    today = today || todayDate();
+    var name = clean((profile || {}).full_name);
+    var emails = listOf((profile || {}).emails);
+    var reply = emails[0] || '';
+    var service = clean(broker.name) || 'сервис';
+    var orig = clean(original).slice(0, 10);
+    var L = [];
+    if (language === 'en') {
+      L.push('To: ' + service);
+      L.push('From: ' + (name || 'a data subject') + (reply ? ' <' + reply + '>' : ''));
+      L.push('Date: ' + enDate(today));
+      L.push('');
+      L.push('Dear Sir or Madam,');
+      L.push('');
+      L.push('On ' + (orig || '[date]') + ' I submitted a request for erasure of my personal data under Articles 15, 17 and 21 GDPR.');
+      L.push('The one-month period of Article 12(3) GDPR has expired without a substantive reply.');
+      L.push('');
+      L.push('I repeat the request: erase my personal data, including copies and data shared with third parties, and confirm in writing.');
+      L.push('Otherwise I will complain to the supervisory authority (Art. 77 GDPR) and seek a judicial remedy (Art. 79, 82 GDPR).');
+      L.push('');
+      L.push('Sincerely,');
+      L.push(name || 'A data subject');
+      if (reply) L.push(reply);
+      return { language: 'en', kind: 'followup', subject: 'Second request — erasure (GDPR Art. 17) — ' + service, body: L.join('\n') };
+    }
+    L.push('Кому: ' + service);
+    L.push('От: ' + (name || 'субъекта персональных данных') + (reply ? ', ' + reply : ''));
+    L.push('Дата: ' + ruDate(today));
+    L.push('');
+    L.push('Здравствуйте!');
+    L.push('');
+    L.push('Направляю повторное требование. Ранее, ' + (orig || '[дата]') + ', я требовал(а) удалить мои персональные данные на основании статей 14 и 21 152-ФЗ.');
+    L.push('Срок, установленный статьёй 21 152-ФЗ (30 дней), истёк, ответ в порядке статьи 20 152-ФЗ не получен, данные не уничтожены.');
+    L.push('');
+    L.push('Повторно требую прекратить обработку и уничтожить мои персональные данные, включая копии и резервные копии, а также направить письменное подтверждение.');
+    L.push('В случае отсутствия ответа в течение 14 дней обращусь с жалобой в Роскомнадзор и в суд.');
+    L.push('');
+    L.push('С уважением,');
+    L.push(name || 'субъект персональных данных');
+    if (reply) L.push(reply);
+    return { language: 'ru', kind: 'followup', subject: 'Повторное требование об удалении персональных данных — ' + service, body: L.join('\n') };
+  }
+
+  function buildLocalComplaint(profile, request) {
+    var today = todayDate();
+    var name = clean((profile || {}).full_name) || 'субъект персональных данных';
+    var emails = listOf((profile || {}).emails);
+    var reply = emails[0] || '';
+    var service = request.broker_name || 'оператор';
+    var sent = clean(request.sent_at).slice(0, 10) || '[дата]';
+    var L = [];
+    L.push('В Федеральную службу по надзору в сфере связи,');
+    L.push('информационных технологий и массовых коммуникаций (Роскомнадзор)');
+    L.push('');
+    L.push('Заявитель: ' + name + (reply ? ', ' + reply : ''));
+    L.push('Дата: ' + ruDate(today));
+    L.push('');
+    L.push('Жалоба на оператора: ' + service);
+    L.push('');
+    L.push(sent + ' я направил(а) оператору требование об удалении персональных данных на основании статей 14 и 21 152-ФЗ.');
+    L.push('Ответ в порядке статьи 20 152-ФЗ не получен, данные в срок статьи 21 152-ФЗ (30 дней) не уничтожены.');
+    L.push('');
+    L.push('Прошу провести проверку, выдать предписание об устранении нарушения и привлечь оператора по статье 13.11 КоАП РФ.');
+    L.push('');
+    L.push('Приложения: копия требования, подтверждение отправки, переписка.');
+    L.push('');
+    L.push('С уважением,');
+    L.push(name);
+    if (reply) L.push(reply);
+    return { language: 'ru', kind: 'complaint_rkn', subject: 'Жалоба на нарушение законодательства о персональных данных — ' + service, body: L.join('\n') };
+  }
+
   /* ----------------------- демо-статистика ----------------------- */
   var DEMO_SPEC = [
     ['Spokeo', 'people_search', 'form', 'deleted', 41, 9],
@@ -199,7 +273,20 @@
     demo: null,
     filterCat: 'all',
     filterStatus: 'all',
-    busy: false
+    busy: false,
+    aiMode: 'advice',
+    aiStreaming: false,
+    abort: null,
+    models: [],
+    settings: {
+      smtp: { host: '', port: 587, user: '', from_addr: '', from_name: 'DataCleaner', use_ssl: false, use_starttls: true, has_password: false },
+      autopilot: { auto_send: false, followup_enabled: false, followup_days: 30, interval_minutes: 15 },
+      resolved: { ready: false, host: '', port: 587, from_addr: '', user: '' },
+      presets: [],
+      dry_run: true
+    },
+    facts: (typeof LOCAL_FACTS !== 'undefined' ? LOCAL_FACTS : []),
+    pilotLog: []
   };
 
   /* --------------------------- HTTP-обёртка --------------------------- */
@@ -274,6 +361,10 @@
         var rq = await http('GET', 'api/requests');
         state.requests = (rq && rq.items) || [];
         state.llmServer = (await http('GET', 'api/assistant/status')) || { configured: false };
+        try {
+          state.settings = await http('GET', 'api/settings');
+          state.facts = ((await http('GET', 'api/knowledge')) || {}).facts || state.facts;
+        } catch (e) { /* настройки недоступны — работаем на значениях по умолчанию */ }
       } else {
         state.profile = Store.get(K.profile, {}) || {};
         state.profileUpdated = Store.get(K.profile + '.at', null);
@@ -285,6 +376,9 @@
         state.requests = localRequests();
         state.llm = Object.assign({}, state.llm, Store.get(K.llm, {}) || {});
         state.llmServer = { configured: !!(state.llm.base_url && state.llm.api_key && state.llm.model), local: true };
+        var localSettings = Store.get('dc.v1.settings', null);
+        if (localSettings) state.settings = Object.assign({}, state.settings, localSettings);
+        state.settings.serverOnly = true;
       }
       state.chat = Store.get(K.chat, []) || [];
     },
@@ -493,6 +587,95 @@
       Store.set(K.llm, state.llm);
       state.llmServer = { configured: !!(state.llm.base_url && state.llm.api_key && state.llm.model), local: true };
       return { ok: true };
+    },
+
+    /* ---- настройки: почта и автопилот ---- */
+    getSettings: async function () {
+      if (state.server) state.settings = await http('GET', 'api/settings');
+      return state.settings;
+    },
+
+    saveSettings: async function (payload) {
+      if (state.server) {
+        state.settings = await http('PUT', 'api/settings', payload);
+      } else {
+        state.settings = Object.assign({}, state.settings, payload);
+        Store.set('dc.v1.settings', state.settings);
+      }
+      return state.settings;
+    },
+
+    testSmtp: async function (opts) {
+      if (!state.server) {
+        return { ok: false, detail: 'Проверка и автоотправка работают только в серверной версии: браузер не может отправить письмо с вашего домена.' };
+      }
+      return await http('POST', 'api/settings/smtp/test', opts || {});
+    },
+
+    runAutopilot: async function () {
+      if (!state.server) {
+        return { ok: false, detail: 'Автопилот доступен в серверной версии (FastAPI). В локальном режиме письма отправляются вручную.' };
+      }
+      var res = await http('POST', 'api/autopilot/run', {});
+      var rq = await http('GET', 'api/requests');
+      state.requests = (rq && rq.items) || [];
+      state.pilotLog.unshift(res.report);
+      return res;
+    },
+
+    bulkSend: async function () {
+      if (!state.server) {
+        var sent = [];
+        for (var i = 0; i < state.requests.length; i++) {
+          if (state.requests[i].status === 'draft') sent.push(await Api.send(state.requests[i].id));
+        }
+        return { ok: true, detail: 'Локальный режим: черновики отмечены отправленными (письма копируются вручную).', sent: sent, failed: [] };
+      }
+      var res = await http('POST', 'api/requests/autosend', {});
+      var rq2 = await http('GET', 'api/requests');
+      state.requests = (rq2 && rq2.items) || [];
+      return res;
+    },
+
+    followup: async function (id) {
+      if (state.server) {
+        var res = await http('POST', 'api/requests/' + id + '/followup', {});
+        var rq = await http('GET', 'api/requests');
+        state.requests = (rq && rq.items) || [];
+        return res;
+      }
+      var req = state.requests.filter(function (r) { return String(r.id) === String(id); })[0];
+      if (!req) throw new Error('Запрос не найден');
+      var letter = buildFollowup(state.profile, { name: req.broker_name, language: req.language }, req.language, todayDate(), req.sent_at);
+      localEvent(req, 'followup', req.status, req.status, 'Подготовлено повторное требование (отправьте вручную)');
+      persistRequests(state.requests);
+      return { ok: true, dry_run: true, detail: 'Напоминание сформировано — скопируйте и отправьте.', letter: letter };
+    },
+
+    complaint: async function (id) {
+      if (state.server) return await http('POST', 'api/requests/' + id + '/complaint', {});
+      var req = state.requests.filter(function (r) { return String(r.id) === String(id); })[0];
+      if (!req) throw new Error('Запрос не найден');
+      return { ok: true, letter: buildLocalComplaint(state.profile, req) };
+    },
+
+    knowledge: async function () {
+      if (state.server) {
+        try { state.facts = ((await http('GET', 'api/knowledge')) || {}).facts || state.facts; } catch (e) { /* ignore */ }
+      }
+      return state.facts;
+    },
+
+    models: async function () {
+      if (state.server) {
+        try {
+          var res = await http('GET', 'api/models');
+          state.models = (res && res.models) || [];
+          return res;
+        } catch (e) { return { ok: false, models: [] }; }
+      }
+      state.models = [state.llm.model].filter(Boolean);
+      return { ok: false, models: state.models };
     },
 
     ask: async function (question, history) {

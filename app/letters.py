@@ -305,3 +305,79 @@ def build_letter(profile: dict, broker: dict, today: date | None = None, languag
     if lang not in ("ru", "en"):
         lang = "ru"
     return build_ru_letter(profile, broker, today) if lang == "ru" else build_en_letter(profile, broker, today)
+
+
+# ------------------------------------------------------------ напоминание
+def build_followup(profile: dict, broker: dict, language: str | None = None,
+                   today: date | None = None, original_date: str | None = None) -> dict:
+    """Напоминание оператору, который не ответил в срок (30 дней / месяц по GDPR)."""
+    lang = _s(language) or _s(broker.get("language")) or _s(profile.get("language")) or "ru"
+    today = today or date.today()
+    name = _s(profile.get("full_name"))
+    service = _broker_name(broker)
+    reply = _reply_channel(profile, lang)
+    original = _s(original_date)[:10]
+
+    if lang == "en":
+        subject = f"Second request — failure to answer the erasure request (GDPR Art. 17, 12(3)) — {service}"
+        parts = [
+            f"To: {service}" + (f" — {_s(broker.get('email'))}" if _s(broker.get("email")) else " — Privacy / DPO"),
+            f"From: {name or 'a data subject'}" + (f" <{reply}>" if reply else ""),
+            f"Date: {_date_en(today)}",
+            "",
+            "Dear Sir or Madam,",
+            "",
+            f"On {original or '[date]'} I submitted a request for erasure of my personal data under "
+            "Articles 15, 17 and 21 GDPR and CCPA §1798.105. The one-month period set by Article 12(3) "
+            "GDPR has expired and I have not received a substantive reply.",
+            "",
+            "I repeat the request: erase my personal data, including copies, backups and data shared "
+            "with third parties, and confirm the erasure in writing.",
+            "",
+            "If I do not receive a reply within 14 days, I will lodge a complaint with the supervisory "
+            "authority under Article 77 GDPR and may seek a judicial remedy under Article 79 GDPR, "
+            "including compensation for damage under Article 82 GDPR.",
+            "",
+            "Sincerely,",
+            name or "A data subject",
+        ]
+        if reply:
+            parts.append(reply)
+    else:
+        subject = f"Повторное требование об удалении персональных данных — {service}"
+        parts = [
+            f"Кому: {service}" + (f" ({_s(broker.get('email'))})" if _s(broker.get("email")) else ""),
+            f"От: {name or 'субъекта персональных данных'}" + (f", {reply}" if reply else ""),
+            f"Дата: {_date_ru(today)}",
+            "",
+            "Здравствуйте!",
+            "",
+            f"{_date_ru(today)} направляю повторное требование. Ранее, "
+            f"{original or '[дата]'}, я уже требовал(а) удалить мои персональные данные на основании "
+            "статей 14 и 21 Федерального закона № 152-ФЗ «О персональных данных».",
+            "",
+            "Срок, установленный статьёй 21 152-ФЗ (30 дней с даты получения требования), истёк, "
+            "ответ в порядке статьи 20 152-ФЗ не получен, данные не уничтожены.",
+            "",
+            "Повторно требую:",
+            "  1) прекратить обработку и уничтожить мои персональные данные, включая копии и "
+            "резервные копии, а также данные, переданные третьим лицам;",
+            "  2) направить мне письменное подтверждение уничтожения.",
+            "",
+            "Если в течение 14 дней ответ не поступит, я обращусь с жалобой в Роскомнадзор "
+            "и в суд, а также поставлю вопрос о взыскании компенсации морального вреда.",
+            "",
+            "С уважением,",
+            name or "субъект персональных данных",
+        ]
+        if reply:
+            parts.append(reply)
+
+    return {
+        "language": lang,
+        "kind": "followup",
+        "subject": subject,
+        "body": "\n".join(parts).rstrip() + "\n",
+        "deadline_days": 14,
+        "deadline_date": (today + timedelta(days=14)).isoformat(),
+    }

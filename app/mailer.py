@@ -1,8 +1,8 @@
 """Отправка писем через SMTP.
 
-DRY_RUN=1 по умолчанию: письма НЕ уходят, но полностью проходят через тот же
-код (шифрование, сборка MIME, проверка получателя). Так можно тестировать
-воронку без риска отправить что-то лишнее.
+Настройки берутся из интерфейса (таблица kv, пароль зашифрован) или из
+переменных окружения. DRY_RUN=1 по умолчанию: письмо собирается полностью,
+но не отправляется — так можно проверить воронку без риска.
 
 Письма — только text/plain. Никаких HTML, пикселей, внешних картинок и
 заголовков вида X-Tracking: получатель — не объект слежки.
@@ -19,6 +19,7 @@ from typing import Any
 
 
 def smtp_config() -> dict[str, Any]:
+    """Настройки из окружения (используется как запасной источник)."""
     return {
         "host": os.getenv("SMTP_HOST", "").strip(),
         "port": int(os.getenv("SMTP_PORT", "587") or 587),
@@ -31,27 +32,71 @@ def smtp_config() -> dict[str, Any]:
     }
 
 
-def is_smtp_configured() -> bool:
-    cfg = smtp_config()
-    return bool(cfg["host"] and cfg["from_addr"])
+def is_smtp_configured(cfg: dict[str, Any] | None = None) -> bool:
+    cfg = cfg or smtp_config()
+    return bool(cfg.get("host") and (cfg.get("from_addr") or cfg.get("user")))
 
 
 def dry_run_enabled() -> bool:
     return os.getenv("DRY_RUN", "1") not in ("0", "false", "False", "no")
 
 
-def build_message(to_email: str, subject: str, body: str, reply_to: str | None = None) -> EmailMessage:
-    cfg = smtp_config()
+def build_message(to_email: str, subject: str, body: str, reply_to: str | None = None,
+                  cfg: dict[str, Any] | None = None) -> EmailMessage:
+    cfg = cfg or smtp_config()
+    from_addr = cfg.get("from_addr") or cfg.get("user") or "noreply@localhost"
     msg = EmailMessage()
     msg["Subject"] = subject
-    msg["From"] = formataddr((cfg["from_name"], cfg["from_addr"] or "noreply@localhost"))
+    msg["From"] = formataddr((cfg.get("from_name") or "DataCleaner", from_addr))
     msg["To"] = to_email
     if reply_to:
         msg["Reply-To"] = reply_to
-    msg["Message-ID"] = make_msgid(domain=(cfg["from_addr"].split("@")[-1] if "@" in cfg["from_addr"] else "datacleaner.local"))
+    domain = from_addr.split("@")[-1] if "@" in from_addr else "datacleaner.local"
+    msg["Message-ID"] = make_msgid(domain=domain)
     msg["Auto-Submitted"] = "auto-generated"
     msg.set_content(body, subtype="plain", charset="utf-8")
     return msg
+
+
+def _connect(cfg: dict[str, Any], timeout: int = 25):
+    if cfg.get("use_ssl"):
+        ctx = ssl.create_default_context()
+        return smtplib.SMTP_SSL(cfg["host"], int(cfg.get("port") or 465), timeout=timeout, context=ctx)
+    smtp = smtplib.SMTP(cfg["host"], int(cfg.get("port") or 587), timeout=timeout)
+    if cfg.get("use_starttls"):
+        smtp.starttls(context=ssl.create_default_context())
+    return smtp
+
+
+def verify_smtp(cfg: dict[str, Any], probe_to: str | None = None) -> dict[str, Any]:
+    """Проверка соединения и логина без отправки письма (EHLO + NOOP).
+
+    Если передан probe_to — отправит одно короткое тестовое письмо на этот адрес.
+    """
+    if not cfg.get("host"):
+        return {"ok": False, "detail": "Не задан SMTP-сервер (host)."}
+    try:
+        with _connect(cfg) as smtp:
+            smtp.ehlo()
+            if cfg.get("user"):
+                smtp.login(cfg["user"], cfg.get("password", ""))
+            smtp.noop()
+            if probe_to:
+                msg = build_message(probe_to, "DataCleaner: проверка отправки",
+                                    "Это тестовое письмо. Если вы его видите — SMTP настроен верно, "
+                                    "и запросы на удаление данных будут уходить автоматически.", cfg=cfg)
+                smtp.send_message(msg)
+                return {"ok": True, "detail": f"Соединение и логин в порядке. Тестовое письмо отправлено на {probe_to}."}
+            return {"ok": True, "detail": "Соединение и логин в порядке. Письма можно отправлять."}
+    except smtplib.SMTPAuthenticationError:
+        return {"ok": False, "detail": "Сервер отклонил логин или пароль. Для Gmail/Яндекс/Mail.ru нужен "
+                                       "«пароль приложения», а не пароль от почты."}
+    except smtplib.SMTPException as exc:
+        return {"ok": False, "detail": f"SMTP-ошибка: {exc.__class__.__name__}: {exc}"}
+    except (OSError, ssl.SSLError) as exc:
+        return {"ok": False, "detail": f"Не удалось подключиться к {cfg.get('host')}:{cfg.get('port')} "
+                                       f"({exc.__class__.__name__}). Проверьте порт и шифрование "
+                                       f"(465 = SSL, 587 = STARTTLS)."}
 
 
 def send_email(
@@ -60,17 +105,18 @@ def send_email(
     body: str,
     reply_to: str | None = None,
     force_dry_run: bool | None = None,
+    cfg: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Возвращает {ok, dry_run, detail, message_id}."""
+    cfg = cfg or smtp_config()
     to_email = (to_email or "").strip()
     if not to_email or "@" not in to_email:
         return {"ok": False, "dry_run": dry_run_enabled(), "detail": "Не указан или некорректен email получателя."}
 
     dry = dry_run_enabled() if force_dry_run is None else force_dry_run
-    cfg = smtp_config()
 
     try:
-        msg = build_message(to_email, subject, body, reply_to)
+        msg = build_message(to_email, subject, body, reply_to, cfg=cfg)
     except Exception as exc:  # noqa: BLE001
         return {"ok": False, "dry_run": dry, "detail": f"Не удалось собрать письмо: {exc}"}
 
@@ -78,33 +124,27 @@ def send_email(
         return {
             "ok": True,
             "dry_run": True,
-            "detail": f"DRY_RUN=1: письмо для {to_email} собрано, но не отправлено. "
-                      f"Размер: {len(body)} символов. Для реальной отправки задайте DRY_RUN=0 "
-                      f"и настройки SMTP.",
+            "detail": f"DRY_RUN: письмо для {to_email} собрано, но не отправлено. Выключите DRY_RUN "
+                      f"и настройте SMTP, чтобы отправлять автоматически.",
             "message_id": msg["Message-ID"],
         }
 
-    if not is_smtp_configured():
+    if not is_smtp_configured(cfg):
         return {
             "ok": False,
             "dry_run": False,
-            "detail": "SMTP не настроен: задайте SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM.",
+            "detail": "SMTP не настроен: откройте «Автопилот → Почта» и укажите сервер, логин и пароль приложения.",
         }
 
     try:
-        if cfg["use_ssl"]:
-            context = ssl.create_default_context()
-            with smtplib.SMTP_SSL(cfg["host"], cfg["port"], timeout=25, context=context) as smtp:
-                _login_and_send(smtp, cfg, msg)
-        else:
-            with smtplib.SMTP(cfg["host"], cfg["port"], timeout=25) as smtp:
-                if cfg["use_starttls"]:
-                    smtp.starttls(context=ssl.create_default_context())
-                _login_and_send(smtp, cfg, msg)
+        with _connect(cfg) as smtp:
+            if cfg.get("user"):
+                smtp.login(cfg["user"], cfg.get("password", ""))
+            smtp.send_message(msg)
     except smtplib.SMTPAuthenticationError:
         return {"ok": False, "dry_run": False,
-                "detail": "SMTP отклонил логин/пароль. Для Gmail/Яндекс нужен «пароль приложения», а не пароль аккаунта."}
-    except (smtplib.SMTPException, OSError) as exc:
+                "detail": "SMTP отклонил логин/пароль. Для Gmail/Яндекс нужен «пароль приложения»."}
+    except (smtplib.SMTPException, OSError, ssl.SSLError) as exc:
         return {"ok": False, "dry_run": False, "detail": f"Ошибка SMTP: {exc.__class__.__name__}: {exc}"}
 
     return {
@@ -113,9 +153,3 @@ def send_email(
         "detail": f"Письмо отправлено на {to_email}.",
         "message_id": msg["Message-ID"],
     }
-
-
-def _login_and_send(smtp: smtplib.SMTP, cfg: dict[str, Any], msg: EmailMessage) -> None:
-    if cfg["user"]:
-        smtp.login(cfg["user"], cfg["password"])
-    smtp.send_message(msg)

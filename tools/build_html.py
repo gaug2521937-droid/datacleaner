@@ -17,6 +17,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -72,7 +73,10 @@ def main() -> None:
         target.write_text(html, encoding="utf-8")
         size = len(html.encode("utf-8"))
         print(f"собрано: {target.relative_to(ROOT)} ({size / 1024:.1f} КиБ)")
-    externals = [token for token in ("http://", "https://") if token in html.split("<script>")[0]]
+    head = html.split("<script>")[0]
+    # xmlns и data:-URI — не сетевые запросы, поэтому их не считаем
+    probe = re.sub(r"xmlns='[^']*'|xmlns=\"[^\"]*\"|data:[^\"'()\s]+", "", head)
+    externals = sorted({m.group(0) for m in re.finditer(r"https?://[^\"'\s>]+", probe)})
     print("внешние ресурсы в разметке/CSS:", externals or "нет")
 
 

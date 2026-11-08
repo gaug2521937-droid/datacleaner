@@ -1,5 +1,5 @@
 /* ==================================================================
-   DataCleaner · 03-ui.js — рендеринг интерфейса.
+   DataCleaner · 03-ui.js — рендеринг интерфейса 1.1
    ================================================================== */
 
   var $ = function (sel, root) { return (root || document).querySelector(sel); };
@@ -17,7 +17,10 @@
     refresh: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>',
     warn: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.6L2.5 17a2 2 0 0 0 1.7 3h15.6a2 2 0 0 0 1.7-3L13.7 3.6a2 2 0 0 0-3.4 0z"/></svg>',
     info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>',
-    mail: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 7l10 6 10-6"/></svg>'
+    mail: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 7l10 6 10-6"/></svg>',
+    bell: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 8-3 8h18s-3-1-3-8"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>',
+    gavel: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M14 10l-7.5 7.5a2.1 2.1 0 0 0 3 3L17 13"/><path d="M13 4l7 7"/><path d="M16.5 6.5l-3-3 3-3 3 3z" transform="rotate(45 15 4)"/></svg>',
+    zap: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4.5 13.5H11l-1 8.5L19.5 10H13l0-8z"/></svg>'
   };
 
   /* ----------------------------- уведомления ----------------------------- */
@@ -25,8 +28,7 @@
     var wrap = $('#toasts');
     var el = document.createElement('div');
     el.className = 'toast ' + (type || 'ok');
-    var icon = (type === 'bad' || type === 'warn') ? ICONS.warn : ICONS.check;
-    el.innerHTML = icon + '<div>' + esc(msg) + '</div>';
+    el.innerHTML = ((type === 'bad' || type === 'warn') ? ICONS.warn : ICONS.check) + '<div>' + esc(msg) + '</div>';
     wrap.appendChild(el);
     setTimeout(function () {
       el.classList.add('out');
@@ -48,27 +50,33 @@
       foot.appendChild(el);
     });
     $('#modal').classList.add('open');
+    document.body.classList.add('modal-open');
     if (onMount) onMount();
   }
   function closeModal() {
     $('#modal').classList.remove('open');
+    document.body.classList.remove('modal-open');
   }
 
   function statusPill(status) {
     return '<span class="pill ' + (STATUS_CLASS[status] || 'neutral') + '">' + esc(STATUS_LABELS[status] || status) + '</span>';
   }
 
+  var VIEWS = ['dashboard', 'requests', 'catalog', 'autopilot', 'ai', 'profile'];
   function navigate(view) {
+    if (VIEWS.indexOf(view) === -1) view = 'dashboard';
     state.view = view;
     $$('.view').forEach(function (v) { v.classList.toggle('active', v.id === 'view-' + view); });
-    $$('#nav button').forEach(function (b) { b.classList.toggle('active', b.dataset.view === view); });
+    $$('#nav button, #bottom-nav button').forEach(function (b) {
+      b.classList.toggle('active', b.dataset.view === view);
+    });
     window.scrollTo({ top: 0, behavior: 'smooth' });
     if (view === 'dashboard') renderDashboard();
     if (view === 'profile') renderProfile();
     if (view === 'catalog') renderCatalog();
     if (view === 'requests') renderRequests();
+    if (view === 'autopilot') renderAutopilot();
     if (view === 'ai') renderAI();
-    if (view === 'data') renderData();
   }
 
   /* -------------------------------- ОБЗОР -------------------------------- */
@@ -81,29 +89,70 @@
     paintDashboard(stats);
   }
 
+  function ruNum(v) {
+    return String(v == null ? '' : v).replace('.', ',');
+  }
+
   function barRow(label, value, percent, cls, overridePercent) {
     var pct = overridePercent != null ? overridePercent : (percent == null ? 0 : percent);
     pct = Math.max(0, Math.min(100, pct));
-    return '<div class="bar-row"><div class="bar-head"><span>' + esc(label) + '</span><b>' + esc(String(value)) +
-      (percent != null ? ' · ' + percent + '%' : '') + '</b></div>' +
-      '<div class="bar-track"><div class="bar-fill ' + (cls || '') + '" style="width:' + pct + '%"></div></div></div>';
+    return '<div class="bar-row"><div class="bar-head"><span>' + esc(label) + '</span><b>' + esc(ruNum(value)) +
+      (percent != null ? ' · ' + ruNum(percent) + '%' : '') + '</b></div>' +
+      '<div class="track"><div class="fill ' + (cls || '') + '" style="width:' + pct + '%"></div></div></div>';
+  }
+
+  function sparkFor(activity, mode) {
+    var values = (activity || []).map(function (a) { return a.count; });
+    if (mode === 'cumulative') {
+      var acc = 0;
+      values = values.map(function (v) { acc += v; return acc; });
+    }
+    return sparkline(values, 74, 26);
   }
 
   function paintDashboard(stats) {
     var k = stats.kpi;
+    var sentSeries = (stats.activity || []).map(function (a) { return a.count; });
 
     $('#kpi-sent').textContent = k.sent;
-    $('#kpi-sent-hint').textContent = k.total
-      ? 'из ' + k.total + ' ' + plural(k.total, 'запроса', 'запросов', 'запросов') + ' создано'
-      : 'писем и обращений';
+    $('#kpi-sent-hint').textContent = k.total ? 'из ' + k.total + ' ' + plural(k.total, 'запроса', 'запросов', 'запросов') : 'писем и обращений';
     $('#kpi-waiting').textContent = k.waiting;
-    $('#kpi-waiting-hint').textContent = k.waiting ? 'в пределах 30 дней' : 'нет активных ожиданий';
+    $('#kpi-waiting-hint').textContent = k.waiting ? 'в пределах срока' : 'нет активных ожиданий';
     $('#kpi-overdue').textContent = k.overdue;
-    $('#kpi-overdue-hint').textContent = k.overdue
-      ? ('макс. просрочка ' + k.oldest_overdue_days + ' ' + plural(k.oldest_overdue_days, 'день', 'дня', 'дней'))
-      : 'сроки соблюдаются';
+    $('#kpi-overdue-hint').textContent = k.overdue ? ('макс. ' + k.oldest_overdue_days + ' ' + plural(k.oldest_overdue_days, 'день', 'дня', 'дней')) : 'сроки соблюдаются';
     $('#kpi-deleted').textContent = k.deleted;
-    $('#kpi-deleted-hint').textContent = k.deleted ? 'подтверждено сервисами' : 'пока нет подтверждений';
+    $('#kpi-deleted-hint').textContent = k.deleted ? 'подтверждено' : 'пока нет';
+
+    $('#spark-sent').innerHTML = sparkFor(stats.activity, 'plain');
+    $('#spark-wait').innerHTML = sparkFor(stats.activity, 'cumulative');
+    $('#spark-over').innerHTML = sparkline(sentSeries.map(function (v, i) { return i % 3 === 0 ? v : 0; }), 74, 26);
+    $('#spark-del').innerHTML = sparkFor(stats.activity, 'cumulative');
+
+    $('#hero-stats').innerHTML = [
+      ['Запросов', k.total], ['Удалено', k.deleted], ['Просрочено', k.overdue]
+    ].map(function (p) {
+      return '<div class="hero-stat"><b>' + p[1] + '</b><span>' + p[0] + '</span></div>';
+    }).join('');
+
+    var hvSent = $('#hv-sent');
+    if (hvSent) {
+      hvSent.textContent = k.sent + ' / ' + k.total;
+      $('#hv-bar-sent').style.width = (k.total ? Math.round(k.sent / k.total * 100) : 0) + '%';
+      $('#hv-deleted').textContent = k.deleted;
+      $('#hv-bar-del').style.width = (k.total ? Math.round(k.deleted / k.total * 100) : 0) + '%';
+      $('#hv-overdue').textContent = k.overdue;
+      var smtpPill = $('#hv-smtp');
+      var ready = state.settings && state.settings.resolved && state.settings.resolved.ready;
+      smtpPill.textContent = ready ? 'готов' : 'не настроен';
+      smtpPill.className = 'hv-pill ' + (ready ? 'ok' : 'wait');
+      var pilot = state.settings && state.settings.autopilot;
+      var on = pilot && (pilot.auto_send || pilot.followup_enabled);
+      var hvPilot = $('#hv-pilot');
+      if (hvPilot) {
+        hvPilot.textContent = on ? 'включён' : 'выключен';
+        hvPilot.className = 'hv-pill ' + (on ? 'ok' : 'bad');
+      }
+    }
 
     var rate = Number(k.deletion_rate) || 0;
     $('#ring').style.setProperty('--p', rate);
@@ -113,45 +162,43 @@
     $('#lg-refused').textContent = k.refused;
     $('#lg-drafts').textContent = k.drafts;
 
-    $('#avg-days').textContent = k.avg_response_days == null ? '—' : String(k.avg_response_days).replace('.', ',');
+    var avgEl = $('#avg-days');
+    avgEl.textContent = k.avg_response_days == null ? '—' : String(k.avg_response_days).replace('.', ',');
+    avgEl.style.background = k.avg_response_days == null ? 'none' : '';
+    avgEl.style.color = k.avg_response_days == null ? 'var(--muted-2)' : '';
     $('#avg-note').textContent = k.avg_response_days == null
-      ? 'Пока нет ответов от сервисов — среднее появится после первого ответа.'
-      : 'Считается по ' + (k.responded + k.deleted) + ' ' + plural(k.responded + k.deleted, 'ответу', 'ответам', 'ответам') + ' сервисов.';
+      ? 'Пока нет ответов — среднее появится после первой реакции оператора.'
+      : 'Считается по ' + (k.responded + k.deleted) + ' ' + plural(k.responded + k.deleted, 'ответу', 'ответам', 'ответам') + ' операторов.';
 
     var base = Math.max(k.sent, 1);
     $('#rate-bars').innerHTML = [
-      barRow('Удалено', k.deleted, Math.round(k.deleted / base * 100), 'c3'),
-      barRow('Ответили, но не удалили', k.responded, Math.round(k.responded / base * 100), 'c4'),
-      barRow('Отказ', k.refused, Math.round(k.refused / base * 100), 'c5'),
-      barRow('Доля сервисов, ответивших на запрос', k.response_rate + '%', null, 'c2', Number(k.response_rate) || 0)
+      barRow('Удалено', k.deleted, Math.round(k.deleted / base * 100), 'f3'),
+      barRow('Ответили, но не удалили', k.responded, Math.round(k.responded / base * 100), 'f4'),
+      barRow('Отказ', k.refused, Math.round(k.refused / base * 100), 'f5'),
+      barRow('Доля операторов, ответивших на запрос', k.response_rate + '%', null, 'f2', Number(k.response_rate) || 0)
     ].join('');
 
     $('#funnel').innerHTML = stats.funnel.map(function (f, i) {
-      var cls = ['c5', 'c2', 'c4', 'c3'][i] || 'c2';
-      return barRow(f.label, f.count, f.percent, cls);
+      return barRow(f.label, f.count, f.percent, ['f5', 'f2', 'f4', 'f3'][i] || 'f2');
     }).join('');
 
     var maxDay = Math.max.apply(null, stats.activity.map(function (a) { return a.count; }).concat([1]));
-    /* высота столбца считается от реальной высоты области графика (телефон/ПК) */
     var chartEl = $('#chart');
-    var maxBarPx = Math.max(60, (chartEl.clientHeight || 168) - 30);
+    var maxBarPx = Math.max(60, (chartEl.clientHeight || 172) - 30);
     var narrow = window.innerWidth < 560;
     chartEl.innerHTML = stats.activity.map(function (a, idx) {
       var h = a.count ? Math.max(10, Math.round(a.count / maxDay * maxBarPx)) : 4;
       var d = parseDay(a.date);
       var label = (d && (!narrow || idx % 2 === 1))
-        ? String(d.getDate()).padStart(2, '0') + '.' + String(d.getMonth() + 1).padStart(2, '0')
-        : '';
+        ? String(d.getDate()).padStart(2, '0') + '.' + String(d.getMonth() + 1).padStart(2, '0') : '';
       return '<div class="col" title="' + esc(a.date) + ': ' + a.count + '">' +
         '<div class="bar ' + (a.count ? '' : 'zero') + '" style="height:' + h + 'px"><span>' + a.count + '</span></div>' +
         '<div class="cl">' + esc(label) + '</div></div>';
     }).join('');
 
     $('#categories').innerHTML = stats.by_category.length
-      ? stats.by_category.map(function (c, i) {
-        return barRow(c.label, c.count, c.percent, ['c2', 'c3', 'c4', 'c5'][i % 4]);
-      }).join('')
-      : '<div class="tiny">Пока нет отправленных запросов — разбивка появится после первой отправки.</div>';
+      ? stats.by_category.map(function (c, i) { return barRow(c.label, c.count, c.percent, ['f2', 'f3', 'f4', 'f5'][i % 4]); }).join('')
+      : '<div class="tiny">Пока нет отправленных запросов.</div>';
 
     $('#deadlines').innerHTML = stats.deadlines.length
       ? stats.deadlines.map(function (d) {
@@ -163,26 +210,44 @@
           '<span class="pill ' + cls + '">' + esc(label) + '</span>' +
           '<span class="dt">до ' + esc(fmtDate(d.deadline)) + '</span></div>';
       }).join('')
-      : '<div class="tiny">Активных дедлайнов нет: отправьте первый запрос, и здесь появится таймер 30 дней.</div>';
+      : '<div class="tiny">Активных дедлайнов нет — отправьте первый запрос.</div>';
 
     $('#tips').innerHTML = stats.tips.map(function (t) {
       var warn = /Просрочено|Отказов/.test(t);
-      return '<div class="tip' + (warn ? ' warn' : '') + '">' + (warn ? ICONS.warn : ICONS.info) +
-        '<div>' + esc(t) + '</div></div>';
+      return '<div class="tip' + (warn ? ' warn' : '') + '">' + (warn ? ICONS.warn : ICONS.info) + '<div>' + esc(t) + '</div></div>';
     }).join('');
 
     $('#privacy-note').textContent = stats.note || '';
 
     var banner = $('#demo-banner');
     if (stats.demo) {
-      banner.innerHTML = '<div class="banner">' + ICONS.warn +
-        '<div><b>Демо-режим.</b> Показаны синтетические данные для проверки интерфейса — они не сохранены. ' +
+      banner.innerHTML = '<div class="banner" style="margin-top:16px">' + ICONS.warn +
+        '<div><b>Демо-режим.</b> Показаны синтетические данные — они не сохранены. ' +
         '<button class="btn sm" id="btn-demo-off" style="margin-left:8px">Вернуться к моим данным</button></div></div>';
       var off = $('#btn-demo-off');
       if (off) off.addEventListener('click', function () { state.demo = null; renderDashboard(); });
     } else {
       banner.innerHTML = '';
     }
+
+    paintPilotStrip();
+  }
+
+  function paintPilotStrip() {
+    var ap = (state.settings && state.settings.autopilot) || {};
+    var on = !!(ap.auto_send || ap.followup_enabled);
+    var ready = !!(state.settings && state.settings.resolved && state.settings.resolved.ready);
+    var toggle = $('#pilot-toggle');
+    if (!toggle) return;
+    toggle.checked = !!ap.auto_send;
+    $('#pilot-toggle-label').textContent = ap.auto_send ? 'Автоотправка включена' : 'Автоотправка выключена';
+    $('#pilot-title').textContent = on ? 'Автопилот работает' : 'Автопилот выключен';
+    $('#pilot-desc').textContent = on
+      ? 'Черновики уходят сами, а операторам, которые молчат дольше ' + (ap.followup_days || 30) + ' дней, уходит повторное требование.'
+      : 'Включите автопилот — DataCleaner сам отправит черновики и напомнит операторам, которые молчат дольше срока.';
+    var smtpEl = $('#pilot-smtp');
+    smtpEl.textContent = ready ? (state.settings.resolved.from_addr || 'настроена') : 'не настроена';
+    smtpEl.style.color = ready ? 'var(--mint)' : 'var(--amber)';
   }
 
   /* ------------------------------- ПРОФИЛЬ ------------------------------- */
@@ -195,15 +260,34 @@
     $('#pf-birth').value = p.birth_year || '';
     $('#pf-address').value = p.address || '';
     $('#pf-lang').value = p.language || 'ru';
-    $('#profile-saved-at').textContent = state.profileUpdated
-      ? 'сохранено ' + fmtDateTime(state.profileUpdated)
-      : 'ещё не сохранено';
+    $('#profile-saved-at').textContent = state.profileUpdated ? 'сохранено ' + fmtDateTime(state.profileUpdated) : 'ещё не сохранено';
     $('#storage-note').textContent = state.server
-      ? 'Серверный режим: профиль хранится в SQLite в зашифрованном виде (Fernet: AES-128-CBC + HMAC-SHA256), ключ — в переменной окружения DATA_KEY.'
+      ? 'Серверный режим: профиль хранится в SQLite в зашифрованном виде (Fernet: AES-128-CBC + HMAC-SHA256), ключ — в DATA_KEY.'
       : (storageOK
-        ? 'Браузерный режим: данные лежат только в localStorage этого устройства и никуда не передаются. Полей, которые не заполнены, в письме просто не будет.'
-        : 'Внимание: localStorage недоступен (приватный режим или песочница iframe). Данные живут только в памяти вкладки и исчезнут после перезагрузки.');
+        ? 'Браузерный режим: данные только в localStorage этого устройства. Автоотправка писем доступна в серверной версии.'
+        : 'localStorage недоступен (приватный режим или песочница): данные живут только в памяти вкладки.');
     renderProfilePreview(p);
+
+    var rows = state.server
+      ? [
+        ['Режим', 'серверный (FastAPI + SQLite)'],
+        ['Шифрование ПД', 'Fernet, ключ из DATA_KEY'],
+        ['Отправка писем', state.serverMeta.dry_run ? 'DRY_RUN=1 — письма не уходят' : 'реальная отправка через SMTP'],
+        ['SMTP', (state.settings.resolved && state.settings.resolved.ready) ? 'настроен' : 'не настроен'],
+        ['AI', state.serverMeta.llm_configured ? 'подключён' : 'не настроен'],
+        ['Запросов', String(state.requests.length)]
+      ]
+      : [
+        ['Режим', 'браузерный (без сервера)'],
+        ['Хранилище', storageOK ? 'localStorage этого устройства' : 'только память вкладки'],
+        ['Шифрование', 'нет: данные не покидают устройство'],
+        ['Отправка писем', 'вручную: копирование текста или mailto'],
+        ['AI', (state.llm.base_url && state.llm.api_key) ? 'подключён из браузера' : 'не настроен'],
+        ['Запросов', String(state.requests.length)]
+      ];
+    $('#storage-kv').innerHTML = rows.map(function (r) {
+      return '<dt>' + esc(r[0]) + '</dt><dd>' + esc(r[1]) + '</dd>';
+    }).join('');
   }
 
   function renderProfilePreview(p) {
@@ -220,7 +304,7 @@
       lines.push('');
       rows.forEach(function (r) { lines.push('  • ' + r); });
     } else {
-      lines.push('(Блок с персональными данными пуст — заполните профиль, иначе оператор не сможет вас идентифицировать.)');
+      lines.push('(Блок пуст — заполните профиль, иначе оператор не сможет вас идентифицировать.)');
     }
     $('#profile-preview').textContent = lines.join('\n');
   }
@@ -240,22 +324,22 @@
     root.innerHTML = list.map(function (b) {
       var linked = state.requests.filter(function (r) { return r.broker_id === b.id; })[0];
       return '<article class="broker">' +
-        '<div class="b-top"><div class="b-name">' + esc(b.name) + '</div>' +
-        '<span class="pill neutral">' + esc(b.language === 'en' ? 'EN' : 'RU') + '</span></div>' +
-        '<div class="b-cat">' + esc(CATEGORY_LABELS[b.category] || b.category) + ' · ' +
-        esc(METHOD_LABELS[b.method] || b.method) + (b.custom ? ' · свой' : '') + '</div>' +
+        '<div class="b-head"><div class="b-name">' + esc(b.name) + '</div>' +
+        '<span class="badge lang">' + esc(b.language === 'en' ? 'EN' : 'RU') + '</span></div>' +
+        '<div class="b-cat">' + esc(CATEGORY_LABELS[b.category] || b.category) + ' · ' + esc(METHOD_LABELS[b.method] || b.method) + '</div>' +
         '<div class="b-notes">' + esc(b.notes || '') + '</div>' +
         '<div class="b-meta">' +
-        (b.verify ? '<span class="verify">' + ICONS.warn + 'проверить перед использованием</span>' : '') +
+        (b.verify ? '<span class="badge verify">' + ICONS.warn + 'проверить перед использованием</span>' : '') +
+        (b.custom ? '<span class="badge custom">свой</span>' : '') +
         (b.email ? '<span class="pill neutral">' + esc(b.email) + '</span>' : '') +
         (b.deadline_days ? '<span class="pill neutral">' + b.deadline_days + ' дней</span>' : '') +
         '</div>' +
         '<div class="b-actions">' +
         (linked
-          ? '<button class="btn sm" data-act="goto-request" data-req="' + linked.id + '">' + ICONS.eye + 'Открыть запрос</button>'
+          ? '<button class="btn sm" data-act="goto-request">' + ICONS.eye + 'Открыть запрос</button>'
           : '<button class="btn sm primary" data-act="create" data-broker="' + esc(b.id) + '">' + ICONS.mail + 'Создать запрос</button>') +
-        (b.url ? '<a class="btn sm" href="' + esc(b.url) + '" target="_blank" rel="noopener noreferrer">' + ICONS.link + 'Открыть сайт</a>' : '') +
-        (b.custom ? '<button class="btn sm danger" data-act="del-broker" data-broker="' + esc(b.id) + '">' + ICONS.trash + 'Удалить</button>' : '') +
+        (b.url ? '<a class="btn sm" href="' + esc(b.url) + '" target="_blank" rel="noopener noreferrer">' + ICONS.link + 'Сайт</a>' : '') +
+        (b.custom ? '<button class="btn sm danger" data-act="del-broker" data-broker="' + esc(b.id) + '">' + ICONS.trash + '</button>' : '') +
         '</div></article>';
     }).join('');
   }
@@ -281,17 +365,20 @@
       var actions = [];
       if (r.status === 'draft') actions.push('<button class="btn sm primary" data-act="send" data-id="' + r.id + '">' + ICONS.send + 'Отправить</button>');
       if (r.status === 'sent') actions.push('<button class="btn sm" data-act="status" data-status="responded" data-id="' + r.id + '">' + ICONS.reply + 'Ответили</button>');
-      if (r.status === 'sent' || r.status === 'responded') actions.push('<button class="btn sm ok" data-act="status" data-status="deleted" data-id="' + r.id + '">' + ICONS.check + 'Удалено</button>');
-      if (r.status === 'sent' || r.status === 'responded') actions.push('<button class="btn sm danger" data-act="status" data-status="refused" data-id="' + r.id + '">' + ICONS.x + 'Отказ</button>');
+      if (r.status === 'sent' || r.status === 'responded') {
+        actions.push('<button class="btn sm ok" data-act="status" data-status="deleted" data-id="' + r.id + '">' + ICONS.check + 'Удалено</button>');
+        actions.push('<button class="btn sm danger" data-act="status" data-status="refused" data-id="' + r.id + '">' + ICONS.x + 'Отказ</button>');
+      }
       if (r.status === 'refused') actions.push('<button class="btn sm ok" data-act="status" data-status="deleted" data-id="' + r.id + '">' + ICONS.check + 'Всё же удалили</button>');
+      if (r.status === 'sent') actions.push('<button class="btn sm warn" data-act="followup" data-id="' + r.id + '">' + ICONS.bell + 'Напомнить</button>');
+      if (r.status !== 'draft') actions.push('<button class="btn sm" data-act="complaint" data-id="' + r.id + '">' + ICONS.gavel + 'Жалоба</button>');
       if (r.status !== 'draft') actions.push('<button class="btn sm" data-act="status" data-status="draft" data-id="' + r.id + '">' + ICONS.refresh + 'Повторить</button>');
       actions.push('<button class="btn sm" data-act="view" data-id="' + r.id + '">' + ICONS.eye + 'Письмо</button>');
       actions.push('<button class="btn sm ghost" data-act="note" data-id="' + r.id + '">Заметка</button>');
       actions.push('<button class="btn sm danger" data-act="del" data-id="' + r.id + '" title="Удалить запрос">' + ICONS.trash + '</button>');
 
       return '<article class="req">' +
-        '<div class="req-head"><div class="req-name">' + esc(r.broker_name) + '</div>' +
-        statusPill(r.status) + dlPill + '</div>' +
+        '<div class="req-head"><div class="req-name">' + esc(r.broker_name) + '</div>' + statusPill(r.status) + dlPill + '</div>' +
         '<div class="req-meta">' +
         '<span>' + esc(CATEGORY_LABELS[r.broker_category] || '—') + '</span>' +
         '<span>' + esc(METHOD_LABELS[r.method] || r.method) + '</span>' +
@@ -299,16 +386,95 @@
         '<span>создан ' + esc(fmtDate(r.created_at)) + '</span>' +
         (r.sent_at ? '<span>отправлен ' + esc(fmtDate(r.sent_at)) + '</span>' : '') +
         (r.responded_at ? '<span>ответ ' + esc(fmtDate(r.responded_at)) + '</span>' : '') +
-        '<span>' + esc(r.language === 'en' ? 'English' : 'Русский') + '</span>' +
         '</div>' +
         (r.note ? '<div class="tiny">Заметка: ' + esc(r.note) + '</div>' : '') +
         (r.error ? '<div class="tiny" style="color:#fda4af">' + esc(r.error) + '</div>' : '') +
-        '<div class="req-actions">' + actions.join('') + '</div>' +
-        '</article>';
+        '<div class="req-actions">' + actions.join('') + '</div></article>';
     }).join('');
   }
 
-  /* --------------------------------- AI --------------------------------- */
+  /* ------------------------------ АВТОПИЛОТ ------------------------------ */
+  function renderAutopilot() {
+    var s = state.settings || {};
+    var smtp = s.smtp || {};
+    var ap = s.autopilot || {};
+    var resolved = s.resolved || {};
+
+    var preset = $('#smtp-preset');
+    if (preset && !preset.options.length) {
+      var presets = (s.presets || []).slice();
+      preset.innerHTML = presets.map(function (p) {
+        return '<option value="' + esc(p.id) + '">' + esc(p.label) + '</option>';
+      }).join('') || '<option value="custom">Другой сервер</option>';
+      preset.addEventListener('change', applySmtpPreset);
+    }
+    var hostNow = smtp.host || resolved.host || '';
+    var presetNow = (s.presets || []).filter(function (x) { return x.host && x.host === hostNow; })[0];
+    if (preset) preset.value = presetNow ? presetNow.id : (hostNow ? 'custom' : 'custom');
+    $('#smtp-host').value = hostNow;
+    $('#smtp-port').value = smtp.port || resolved.port || 587;
+    $('#smtp-user').value = smtp.user || resolved.user || '';
+    $('#smtp-from').value = smtp.from_addr || resolved.from_addr || '';
+    $('#smtp-from-name').value = smtp.from_name || 'DataCleaner';
+    $('#smtp-ssl').checked = !!smtp.use_ssl;
+    $('#smtp-starttls').checked = !!smtp.use_starttls;
+    $('#smtp-pass').value = '';
+    $('#smtp-pass').placeholder = smtp.has_password ? 'пароль сохранён — оставьте пустым, чтобы не менять' : '••••••••';
+
+    $('#ap-autosend').checked = !!ap.auto_send;
+    $('#ap-followup').checked = !!ap.followup_enabled;
+    $('#ap-days').value = ap.followup_days || 30;
+    $('#ap-interval').value = ap.interval_minutes || 15;
+
+    var on = !!(ap.auto_send || ap.followup_enabled);
+    var chip = $('#pilot-state-chip');
+    chip.className = 'status-chip ' + (on ? 'live' : '');
+    chip.innerHTML = '<span class="dot"></span><span class="txt">' + (on ? 'включён' : 'выключен') + '</span>';
+
+    $('#smtp-status').innerHTML = resolved.ready
+      ? '<span style="color:var(--mint)">Готово к отправке:</span> ' + esc(resolved.from_addr) + ' через ' + esc(resolved.host) + ':' + esc(String(resolved.port))
+      : '<span style="color:var(--amber)">Почта не подключена.</span> Укажите сервер, логин и пароль приложения — после этого заработает автоотправка.';
+
+    renderPilotLog();
+  }
+
+  function applySmtpPreset() {
+    var id = $('#smtp-preset').value;
+    var presets = (state.settings && state.settings.presets) || [];
+    var p = presets.filter(function (x) { return x.id === id; })[0];
+    if (!p) return;
+    if (p.host) {
+      $('#smtp-host').value = p.host;
+      $('#smtp-port').value = p.port;
+      $('#smtp-ssl').checked = !!p.ssl;
+      $('#smtp-starttls').checked = !!p.starttls;
+    }
+    if (p.hint) $('#smtp-hint').textContent = p.hint;
+  }
+
+  function renderPilotLog() {
+    var root = $('#pilot-log');
+    if (!root) return;
+    if (!state.pilotLog.length) {
+      root.innerHTML = '<div class="tiny">Пока пусто. Нажмите «Прогон сейчас», чтобы увидеть, что сделает автопилот.</div>';
+      return;
+    }
+    root.innerHTML = state.pilotLog.slice(0, 6).map(function (rep) {
+      var sent = (rep.sent || []).length, fups = (rep.followups || []).length, errs = (rep.errors || []).length;
+      var cls = errs ? 'bad' : (sent || fups ? 'ok' : 'neutral');
+      var manual = (rep.manual || []).length;
+      var what = (sent || fups)
+        ? 'отправлено ' + sent + ', напоминаний ' + fups
+        : (manual ? 'автоматически отправлять нечего' : 'нечего отправлять — новых черновиков и просроченных запросов нет');
+      if (manual) what += ' · через форму: ' + manual;
+      if (rep.skipped) what += ' · ' + rep.skipped;
+      return '<div class="dl"><span class="pill ' + cls + '">' + (errs ? 'ошибки: ' + errs : 'выполнено') + '</span>' +
+        '<span class="nm">' + esc(what) + '</span>' +
+        '<span class="dt">' + esc(fmtDateTime(rep.finished_at || rep.started_at)) + '</span></div>';
+    }).join('');
+  }
+
+  /* ---------------------------------- AI ---------------------------------- */
   function renderAI() {
     var configured = state.server
       ? !!(state.llmServer && state.llmServer.configured)
@@ -316,93 +482,45 @@
     var text;
     if (state.server) {
       text = configured
-        ? 'Серверный режим: AI подключён через сервер (модель ' + esc(state.llmServer.model || '—') +
-        ', провайдер ' + esc(state.llmServer.base_url_host || '—') + '). Ключ хранится в переменной окружения LLM_API_KEY и в браузер не попадает.'
-        : 'AI на сервере не настроен. Задайте LLM_API_KEY, LLM_BASE_URL, LLM_MODEL в .env и перезапустите сервер. Всё остальное работает и без AI.';
+        ? 'Серверный режим: модель ' + esc(state.llmServer.model || '—') + ' через ' + esc(state.llmServer.base_url_host || '—') + '. Ключ на сервере, в браузер не попадает. Ответы идут потоком.'
+        : 'AI на сервере не настроен. Задайте LLM_API_KEY, LLM_BASE_URL, LLM_MODEL в Environment и перезапустите сервис. Всё остальное работает без AI.';
     } else {
       text = configured
-        ? 'Браузерный режим: запрос идёт напрямую из браузера на ' + esc(state.llm.base_url) +
-        ' (модель ' + esc(state.llm.model) + '). Ключ хранится только в localStorage этого устройства.'
-        : 'AI-помощник не настроен. Нажмите «Настройки» и укажите Base URL, ключ и модель OpenAI-совместимого провайдера. Без AI всё остальное работает.';
+        ? 'Браузерный режим: запрос идёт напрямую на ' + esc(state.llm.base_url) + ' (модель ' + esc(state.llm.model) + '). Ключ только в этом браузере.'
+        : 'AI не настроен. Нажмите «Настройки» и укажите Base URL, ключ и модель OpenAI-совместимого провайдера.';
     }
     $('#ai-status-text').innerHTML = text;
 
+    var select = $('#ai-model');
+    if (select) {
+      var models = state.models.length ? state.models : [state.llm.model, state.llmServer && state.llmServer.model].filter(Boolean);
+      var current = state.llm.model || (state.llmServer && state.llmServer.model) || '';
+      select.innerHTML = models.map(function (m) {
+        return '<option value="' + esc(m) + '"' + (m === current ? ' selected' : '') + '>' + esc(m) + '</option>';
+      }).join('') || '<option value="">модель не выбрана</option>';
+      select.disabled = state.server; /* на сервере модель задаётся в Environment */
+      select.title = state.server ? 'В серверном режиме модель задаётся переменной LLM_MODEL' : 'Модель для браузерных запросов';
+    }
+
+    $$('#ai-modes .chip').forEach(function (c) { c.classList.toggle('active', c.dataset.mode === state.aiMode); });
+
     var chat = $('#chat');
     if (!state.chat.length) {
-      chat.innerHTML = '<div class="msg bot"><div class="av">AI</div><div class="bubble">Здравствуйте! Помогу разобраться с удалением данных: 152-ФЗ, GDPR, CCPA, жалобы регуляторам, тексты запросов. Я не спрашиваю и не сохраняю ваши персональные данные — ФИО, email и телефоны подставляются в письма локально, в разделе «Запросы».</div></div>';
+      chat.innerHTML = '<div class="msg bot"><div class="av">AI</div><div class="bubble">Здравствуйте! Помогу с удалением данных: 152-ФЗ, GDPR, CCPA, жалобы регуляторам, тактика против отказов. Я не спрашиваю персональные данные — ФИО и контакты подставляются в письма локально.</div></div>';
     } else {
       chat.innerHTML = state.chat.map(function (m) {
         var cls = m.role === 'user' ? 'user' : (m.role === 'system' ? 'sys' : 'bot');
         var av = m.role === 'user' ? 'Вы' : (m.role === 'system' ? '!' : 'AI');
-        return '<div class="msg ' + cls + '"><div class="av">' + av + '</div><div class="bubble">' + esc(m.content) + '</div></div>';
+        var typing = m.streaming ? ' typing' : '';
+        return '<div class="msg ' + cls + '"><div class="av">' + av + '</div><div class="bubble' + typing + '">' + esc(m.content) + '</div></div>';
       }).join('');
       chat.scrollTop = chat.scrollHeight;
     }
-  }
 
-  async function sendChat() {
-    var input = $('#chat-input');
-    var q = clean(input.value);
-    if (!q || state.busy) return;
-    var kinds = detectPII(q);
-    if (kinds.length) {
-      state.chat.push({ role: 'user', content: q });
-      state.chat.push({ role: 'system', content: piiWarning(kinds) });
-      Store.set(K.chat, state.chat);
-      input.value = '';
-      renderAI();
-      toast('Запрос заблокирован: в вопросе есть персональные данные', 'warn', 6000);
-      return;
+    var know = $('#know-list');
+    if (know) {
+      know.innerHTML = (state.facts || []).slice(0, 8).map(function (f) {
+        return '<div class="know-item"><b>' + esc(f.topic || '') + '</b>' + esc(f.text || '') + '</div>';
+      }).join('');
     }
-    state.chat.push({ role: 'user', content: q });
-    input.value = '';
-    renderAI();
-    state.busy = true;
-    var btn = $('#btn-ai-send');
-    btn.disabled = true;
-    var span = btn.querySelector('span');
-    if (span) span.textContent = 'Думаю…';
-    try {
-      var history = state.chat.filter(function (m) { return m.role !== 'system'; }).slice(0, -1);
-      var res = await Api.ask(q, history);
-      if (res.blocked) state.chat.push({ role: 'system', content: res.warning });
-      else if (res.notConfigured) state.chat.push({ role: 'system', content: res.hint });
-      else if (!res.ok) state.chat.push({ role: 'system', content: (res.cors ? 'CORS: ' : 'Ошибка: ') + (res.message || res.detail || 'не удалось получить ответ') });
-      else state.chat.push({ role: 'assistant', content: res.answer });
-    } catch (e) {
-      state.chat.push({ role: 'system', content: 'Ошибка: ' + e.message });
-    } finally {
-      state.busy = false;
-      btn.disabled = false;
-      if (span) span.textContent = 'Спросить';
-      Store.set(K.chat, state.chat);
-      renderAI();
-    }
-  }
-
-  /* -------------------------------- ДАННЫЕ -------------------------------- */
-  function renderData() {
-    var rows = state.server
-      ? [
-        ['Режим', 'серверный (FastAPI + SQLite)'],
-        ['Шифрование ПД', 'Fernet, ключ из DATA_KEY'],
-        ['Отправка писем', state.serverMeta.dry_run ? 'DRY_RUN=1 (письма не уходят)' : 'реальная отправка через SMTP'],
-        ['SMTP', state.serverMeta.smtp_configured ? 'настроен' : 'не настроен'],
-        ['AI', state.serverMeta.llm_configured ? 'подключён' : 'не настроен'],
-        ['Запросов в базе', String(state.requests.length)]
-      ]
-      : [
-        ['Режим', 'браузерный (без сервера)'],
-        ['Хранилище', storageOK ? 'localStorage этого устройства' : 'только память вкладки (localStorage недоступен)'],
-        ['Шифрование', 'нет: данные лежат локально и не передаются по сети'],
-        ['Отправка писем', 'вручную: копирование текста или mailto'],
-        ['AI', (state.llm.base_url && state.llm.api_key) ? 'подключён из браузера' : 'не настроен'],
-        ['Запросов', String(state.requests.length)]
-      ];
-    $('#storage-kv').innerHTML = rows.map(function (r) {
-      return '<dt>' + esc(r[0]) + '</dt><dd>' + esc(r[1]) + '</dd>';
-    }).join('');
-    $('#wipe-note').textContent = state.server
-      ? 'Будут удалены таблицы profile, requests, events, custom_brokers в SQLite. Отменить нельзя.'
-      : 'Будет очищен localStorage этого домена: профиль, запросы, история, свои сервисы и история AI-чата. Отменить нельзя.';
   }

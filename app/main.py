@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -18,10 +19,12 @@ from typing import Any
 
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import assistant, db, letters, mailer, stats as stats_mod
+from . import assistant, autopilot, db, knowledge, letters, mailer
+from . import settings as settings_mod
+from . import stats as stats_mod
 from .crypto import Vault, VaultError
 from .schemas import BrokerIn, ChatIn, ProfileIn, RequestCreate, RequestPatch, SendIn
 
@@ -58,7 +61,13 @@ async def lifespan(app: FastAPI):
         log.error("Проблема с DATA_KEY: %s", exc)
     log.info("DRY_RUN=%s, LLM configured=%s, SMTP configured=%s",
              mailer.dry_run_enabled(), assistant.is_configured(), mailer.is_smtp_configured())
-    yield
+    stop_event = asyncio.Event()
+    autopilot_task = asyncio.create_task(autopilot.loop(stop_event))
+    try:
+        yield
+    finally:
+        stop_event.set()
+        autopilot_task.cancel()
 
 
 app = FastAPI(
@@ -197,15 +206,25 @@ ALLOWED_TRANSITIONS: dict[str, set[str]] = {
 @app.get("/api/health")
 def health(conn=Depends(get_db)) -> dict[str, Any]:
     blob, _ = db.load_profile_blob(conn)
+    smtp_ready = mailer.is_smtp_configured()
+    autopilot_cfg = dict(settings_mod.DEFAULT_AUTOPILOT)
+    try:
+        vault = Vault()
+        autopilot_cfg = settings_mod.load(conn, vault)["autopilot"]
+        smtp_ready = settings_mod.smtp_ready(settings_mod.effective_smtp(conn, vault))
+    except VaultError:
+        pass
     return {
         "ok": True,
         "dry_run": mailer.dry_run_enabled(),
-        "smtp_configured": mailer.is_smtp_configured(),
+        "smtp_configured": smtp_ready,
         "llm_configured": assistant.is_configured(),
         "profile_saved": blob is not None,
         "data_key_from_env": bool(os.getenv("DATA_KEY")),
         "requests": len(db.list_requests(conn)),
         "auth_required": bool(ACCESS_TOKEN),
+        "autopilot": autopilot_cfg,
+        "version": "1.1.0",
         "today": date.today().isoformat(),
     }
 
@@ -368,44 +387,61 @@ def change_status(request_id: int, payload: RequestPatch, conn=Depends(get_db)) 
 
 
 @app.post("/api/requests/{request_id}/send")
-def send_request(request_id: int, payload: SendIn | None = None, conn=Depends(get_db), vault: Vault = Depends(get_vault)) -> dict[str, Any]:
+def send_request(request_id: int, payload: SendIn | None = None, conn=Depends(get_db),
+                 vault: Vault = Depends(get_vault)) -> dict[str, Any]:
     row = db.get_request(conn, request_id)
     if not row:
         raise HTTPException(status_code=404, detail="Запрос не найден")
     if row["status"] != "draft":
         raise HTTPException(status_code=409, detail="Отправить можно только черновик. Используйте «Повторить», чтобы вернуть в черновик.")
+    result = autopilot.send_one(conn, vault, request_id,
+                                dry_run=(payload.force_dry_run if payload else None))
+    return {"ok": result.get("ok", False), "dry_run": result.get("dry_run", True),
+            "detail": result.get("detail", ""),
+            "request": request_public(db.get_request(conn, request_id) or {})}
 
-    body = vault.decrypt_text(row["body_enc"])
-    subject = vault.decrypt_text(row["subject_enc"])
+
+@app.post("/api/requests/autosend")
+def autosend(conn=Depends(get_db), vault: Vault = Depends(get_vault)) -> dict[str, Any]:
+    """Отправить все черновики сразу (кнопка «Отправить все черновики»)."""
+    sent, failed = [], []
+    for row in db.list_requests(conn, "draft"):
+        result = autopilot.send_one(conn, vault, row["id"])
+        item = {"id": row["id"], "broker": row["broker_name"], "detail": result.get("detail", "")}
+        (sent if result.get("ok") else failed).append(item)
+    return {
+        "ok": not failed,
+        "sent": sent,
+        "failed": failed,
+        "detail": (f"Отправлено: {len(sent)}; ошибок: {len(failed)}."
+                   if sent or failed else "Черновиков нет — отправлять нечего."),
+        "dry_run": mailer.dry_run_enabled(),
+    }
+
+
+@app.post("/api/requests/{request_id}/followup")
+def followup(request_id: int, conn=Depends(get_db), vault: Vault = Depends(get_vault)) -> dict[str, Any]:
+    """Повторное требование оператору, который не ответил."""
+    result = autopilot.send_followup(conn, vault, request_id)
+    return {"ok": result.get("ok", False), "detail": result.get("detail", ""),
+            "dry_run": result.get("dry_run", True), "letter": result.get("letter"),
+            "request": request_public(db.get_request(conn, request_id) or {})}
+
+
+@app.post("/api/requests/{request_id}/complaint")
+def complaint(request_id: int, language: str | None = None, conn=Depends(get_db),
+              vault: Vault = Depends(get_vault)) -> dict[str, Any]:
+    """Жалоба регулятору (Роскомнадзор / DPA). Собирается локально, без AI и без ПД в LLM."""
+    row = db.get_request(conn, request_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Запрос не найден")
+    broker = find_broker(conn, row["broker_id"])
     blob, _ = db.load_profile_blob(conn)
     profile = profile_from_blob(vault, blob)
-    reply_to = (profile.get("emails") or [None])[0]
-
-    to_email = row["to_email"]
-    if row["method"] != "email" or not to_email:
-        db.update_request(conn, request_id, status="sent", sent_at=datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
-                          deadline_at=(datetime.now(timezone.utc) + timedelta(days=int(row["deadline_days"] or 30))).replace(microsecond=0).isoformat(),
-                          error="")
-        db.add_event(conn, request_id, "status", "draft", "sent", "Отправлено вручную (форма/ручной способ)")
-        return {"ok": True, "dry_run": True, "detail": "Запрос отмечен отправленным: у сервиса нет email, действуйте через форму по ссылке из карточки.",
-                "request": request_public(db.get_request(conn, request_id) or {})}
-
-    result = mailer.send_email(
-        to_email, subject, body, reply_to=reply_to,
-        force_dry_run=(payload.force_dry_run if payload else None),
-    )
-    if result["ok"]:
-        ts = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
-        db.update_request(conn, request_id, status="sent", sent_at=ts, error="",
-                          deadline_at=(datetime.now(timezone.utc) + timedelta(days=int(row["deadline_days"] or 30))).replace(microsecond=0).isoformat())
-        db.add_event(conn, request_id, "send", "draft", "sent",
-                     ("DRY_RUN: письмо не отправлено" if result["dry_run"] else f"Письмо отправлено на {to_email}")
-                     + (f" · {result.get('message_id', '')}"))
-    else:
-        db.update_request(conn, request_id, error=result["detail"])
-        db.add_event(conn, request_id, "send_failed", "draft", "draft", result["detail"])
-    return {"ok": result["ok"], "dry_run": result["dry_run"], "detail": result["detail"],
-            "request": request_public(db.get_request(conn, request_id) or {})}
+    letter = knowledge.build_complaint(profile, broker, row, language=language)
+    return {"ok": True, "letter": letter,
+            "hint": "Жалоба собрана локально. Отправьте её через сайт Роскомнадзора или портал регулятора, "
+                    "приложив копию требования и подтверждение отправки."}
 
 
 @app.delete("/api/requests/{request_id}")
@@ -542,6 +578,68 @@ def export_data(conn=Depends(get_db), vault: Vault = Depends(get_vault)) -> JSON
     })
 
 
+# --- настройки: SMTP и автопилот ------------------------------------------
+@app.get("/api/settings")
+def get_settings(conn=Depends(get_db), vault: Vault = Depends(get_vault)) -> dict[str, Any]:
+    data = settings_mod.load(conn, vault)
+    effective = settings_mod.effective_smtp(conn, vault)
+    return {"ok": True, **settings_mod.public_view(data, effective, mailer.dry_run_enabled())}
+
+
+@app.put("/api/settings")
+def put_settings(payload: dict[str, Any], conn=Depends(get_db),
+                 vault: Vault = Depends(get_vault)) -> dict[str, Any]:
+    data = settings_mod.save(conn, vault, payload)
+    effective = settings_mod.effective_smtp(conn, vault)
+    return {"ok": True, "detail": "Настройки сохранены (пароль SMTP зашифрован).",
+            **settings_mod.public_view(data, effective, mailer.dry_run_enabled())}
+
+
+@app.post("/api/settings/smtp/test")
+def smtp_test(payload: dict[str, Any] | None = None, conn=Depends(get_db),
+              vault: Vault = Depends(get_vault)) -> dict[str, Any]:
+    cfg = settings_mod.effective_smtp(conn, vault)
+    probe = (payload or {}).get("probe_to") or cfg.get("from_addr")
+    result = mailer.verify_smtp(cfg, probe_to=probe if (payload or {}).get("send_test") else None)
+    return {"ok": result["ok"], "detail": result["detail"], "dry_run": mailer.dry_run_enabled(),
+            "host": cfg.get("host"), "port": cfg.get("port")}
+
+
+@app.post("/api/autopilot/run")
+def autopilot_run(conn=Depends(get_db), vault: Vault = Depends(get_vault)) -> dict[str, Any]:
+    """Принудительный проход автопилота (не ждать интервал)."""
+    return {"ok": True, "report": autopilot.cycle(conn, vault, force=True)}
+
+
+# --- AI -------------------------------------------------------------------
+@app.get("/api/models")
+async def models() -> dict[str, Any]:
+    return await assistant.list_models()
+
+
+@app.post("/api/assistant/stream")
+async def assistant_stream(payload: ChatIn) -> StreamingResponse:
+    """SSE-поток: события data: {"delta": "..."} … data: {"done": true}."""
+    async def generator():
+        async for event in assistant.stream(
+            payload.question,
+            payload.history,
+            mode=(payload.mode or "advice"),
+            context=(payload.context or None),
+        ):
+            yield "data: " + json.dumps(event, ensure_ascii=False) + "\n\n"
+        yield "data: " + json.dumps({"end": True}, ensure_ascii=False) + "\n\n"
+
+    return StreamingResponse(generator(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+@app.get("/api/knowledge")
+def knowledge_base() -> dict[str, Any]:
+    """Локальная база норм — работает и без AI."""
+    return {"ok": True, "facts": knowledge.FACTS}
+
+
 # -------------------------------------------------------------------- static
 if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
@@ -558,4 +656,5 @@ def index():
 @app.get("/api/statuses")
 def statuses() -> dict[str, Any]:
     return {"statuses": db.STATUS_LABELS, "transitions": {k: sorted(v) for k, v in ALLOWED_TRANSITIONS.items()},
-            "categories": stats_mod.CATEGORY_LABELS}
+            "categories": stats_mod.CATEGORY_LABELS, "smtp_presets": settings_mod.SMTP_PRESETS,
+            "autopilot_defaults": settings_mod.DEFAULT_AUTOPILOT}

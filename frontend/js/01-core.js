@@ -88,6 +88,33 @@
     { id: 'ru-marketing-template', name: 'Российская маркетинговая база (шаблон)', category: 'marketing', method: 'email', url: '', email: 'privacy@example.ru', language: 'ru', deadline_days: 30, verify: true, notes: 'ШАБЛОН для рассылочных баз и колл-центров: отзыв согласия и требование прекратить обработку (ст. 9, 21 152-ФЗ).' }
   ];
 
+  var LOCAL_FACTS = [
+    { id: '152fz-14', topic: 'РФ · доступ', text: 'Ст. 14 152-ФЗ: субъект вправе узнать, обрабатываются ли его ПД, какие, зачем, кому передаются и как прекратить обработку.' },
+    { id: '152fz-20', topic: 'РФ · сроки', text: 'Ст. 20 152-ФЗ: ответ на запрос — 10 рабочих дней, продление не более чем на 5 рабочих дней с уведомлением.' },
+    { id: '152fz-21', topic: 'РФ · удаление', text: 'Ст. 21 152-ФЗ: уничтожение данных — до 30 дней с даты получения требования; отзыв согласия действует и для общедоступных источников.' },
+    { id: '152fz-rkn', topic: 'РФ · жалоба', text: 'Жалоба — в Роскомнадзор: копия требования, подтверждение отправки, переписка. Далее — суд и компенсация морального вреда.' },
+    { id: 'gdpr-12', topic: 'ЕС · сроки', text: 'Art. 12(3) GDPR: ответ в течение месяца, продление ещё на два месяца при сложности запроса.' },
+    { id: 'gdpr-17', topic: 'ЕС · удаление', text: 'Art. 17 GDPR: удаление без необоснованной задержки, включая копии и данные у третьих лиц; Art. 21 — возражение против маркетинга.' },
+    { id: 'gdpr-77', topic: 'ЕС · жалоба', text: 'Art. 77 GDPR: жалоба в надзорный орган (DPA); Art. 79 — суд, Art. 82 — компенсация вреда.' },
+    { id: 'ccpa-105', topic: 'США · удаление', text: 'CCPA/CPRA §1798.105: удаление персональной информации, §1798.130 — 45 дней, §1798.120 — отказ от продажи и передачи.' }
+  ];
+
+  function sparkline(values, w, h) {
+    var data = (values || []).filter(function (v) { return typeof v === 'number'; });
+    if (data.length < 2) return '';
+    w = w || 74; h = h || 26;
+    var max = Math.max.apply(null, data), min = Math.min.apply(null, data);
+    var span = (max - min) || 1;
+    var step = w / (data.length - 1);
+    var pts = data.map(function (v, i) {
+      var x = +(i * step).toFixed(2);
+      var y = +(h - 3 - ((v - min) / span) * (h - 6)).toFixed(2);
+      return x + ',' + y;
+    });
+    return '<polyline points="' + pts.join(' ') + '" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" opacity=".9"/>' +
+      '<polyline points="' + pts.join(' ') + ' ' + w + ',' + h + ' 0,' + h + '" fill="currentColor" opacity=".1" stroke="none"/>';
+  }
+
   var LEGAL_RU = [
     'ст. 14 152-ФЗ — право субъекта на доступ к своим персональным данным',
     'ст. 21 152-ФЗ — обязанность оператора прекратить обработку и уничтожить данные',
