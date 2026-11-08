@@ -301,6 +301,52 @@ DATACLEANER_DB=/путь/с/постоянным/диском/datacleaner.db
 CORS_ORIGINS=https://ваш-домен
 ```
 
+### 8.1a Деплой на Render (робот или вручную)
+
+**Автоматически** (нужен GitHub-токен с правами `Contents: Read and write` и
+`Administration: Read and write`, плюс ключ Render):
+
+```bash
+GH_TOKEN=<github_pat_...> \
+RENDER_API_KEY=<rnd_...> \
+LLM_API_KEY=<ключ провайдера> \
+LLM_BASE_URL=https://tokenlavka.com/v1 \
+LLM_MODEL=gpt-6-luna \
+python3 tools/deploy_render.py
+```
+
+Скрипт создаст репозиторий (если нужно), запушит код, создаст Render web service
+(Docker, план free, health check `/api/health`), сгенерирует `DATA_KEY` и `ACCESS_TOKEN`
+и дождётся первого деплоя. Адрес и код доступа он печатает в конце.
+
+**Вручную через панель Render** (5 минут, без токенов):
+
+1. Создайте на GitHub пустой публичный репозиторий (например `datacleaner`) и загрузите в него
+   файлы проекта (GitHub Desktop / `git push`).
+2. Render → **New → Web Service** → выберите репозиторий → Runtime **Docker**
+   (файл `Dockerfile` уже в проекте; альтернатива — Runtime *Python*,
+   build `pip install -r requirements.txt`, start `uvicorn app.main:app --host 0.0.0.0 --port $PORT`).
+3. План **Free**, регион **Frankfurt**, Health Check Path — `/api/health`.
+4. Environment:
+   - `DATA_KEY` — сгенерируйте: `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`
+   - `ACCESS_TOKEN` — любой код доступа, например `dc-` + 24 случайных символа
+   - `DRY_RUN=1`
+   - `DATACLEANER_DB=/data/datacleaner.db`
+   - `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL` — если нужен AI
+   - `SMTP_*` — когда захотите реальную отправку (и `DRY_RUN=0`)
+5. Deploy → дождитесь `Live` → откройте адрес вида `https://datacleaner-xxxx.onrender.com`.
+   Приложение спросит **код доступа** — это значение `ACCESS_TOKEN`.
+6. Проверка: `curl https://ваш-адрес/api/health` → `{"ok":true,"auth_required":true,...}`,
+   а `/api/stats` без заголовка `X-Access-Token` отдаёт `401` — значит защита работает.
+
+> **Про бесплатный план Render:** инстанс засыпает после 15 минут простоя (первый заход
+> ~30–60 секунд) и **диск не постоянный** — SQLite обнулится при передеплое/рестарте.
+> Для регулярного использования: экспорт JSON из раздела «Данные» либо внешняя Postgres
+> (Neon/Supabase free), либо платный диск Render ($1–7/мес).
+> **Про репозиторий:** Render API умеет собирать только публичные репозитории без установки
+> GitHub App. Если нужен приватный — установите Render GitHub App в аккаунт, сделайте репозиторий
+> приватным, и Render продолжит деплой по тому же сервису.
+
 ### 8.2 Безопасность до продакшена
 
 - [ ] Аутентификация (пока её нет — сервер рассчитан на одного пользователя). Минимум —
