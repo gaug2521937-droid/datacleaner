@@ -57,6 +57,18 @@ async def main() -> int:
         smtp_status = await page.inner_text("#smtp-status")
         await page.screenshot(path=str(SHOTS / "live-03-autopilot.png"), full_page=True)
 
+        # новые карточки: простой вход (адрес + пароль) и тумблер реальной отправки
+        quick_note = mode_note = "нет карточки"
+        if await page.locator("#quick-card").count():
+            await page.fill("#quick-email", "ivan@yandex.ru")
+            await page.wait_for_timeout(600)
+            quick_note = (await page.inner_text("#quick-autodetect")).strip()
+            await page.screenshot(path=str(SHOTS / "live-06-quick-login.png"), full_page=False)
+            await page.fill("#quick-email", "")
+        if await page.locator("#send-mode-card").count():
+            mode_note = (await page.inner_text("#send-mode-state")).strip()
+            await page.locator("#send-mode-card").screenshot(path=str(SHOTS / "live-07-send-mode.png"))
+
         await page.click('button[data-view="ai"]')
         await page.wait_for_timeout(600)
         await page.fill("#chat-input", "Как отбить отказ «данные из общедоступных источников»?")
@@ -86,6 +98,8 @@ async def main() -> int:
 
     print("бейдж:", badge)
     print("SMTP:", smtp_status.replace("\n", " ")[:120])
+    print("простой вход:", quick_note.replace("\n", " ")[:160])
+    print("режим отправки:", mode_note)
     print("самопроверка:", selftest)
     print("AI-ответ:", chat.replace("\n", " | ")[-600:])
     print("390 px:", widths)
