@@ -187,7 +187,7 @@ async def mobile_flow(browser) -> dict:
                 "({sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth})")
         await page.click('#bottom-nav button[data-view="dashboard"]')
         await page.wait_for_timeout(500)
-        await shots(page, f"35-{label}-mobile.png")
+        await shots(page, f"35-{label}-mobile.png" if label == "srv" else "36-local-mobile.png")
         out[label] = {"errors": errors, "widths": widths}
         await ctx.close()
     return out
