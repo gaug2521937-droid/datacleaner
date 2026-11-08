@@ -21,12 +21,57 @@ from .crypto import Vault
 
 KV_KEY = "settings.v1"
 
+# Реальная отправка: пустая строка — «как в переменной DRY_RUN»,
+# иначе значение из интерфейса ("0" — отправлять, "1" — не отправлять).
+DEFAULT_APP = {"dry_run_override": ""}
+
 DEFAULT_AUTOPILOT = {
     "auto_send": False,          # отправлять новые черновики сами
     "followup_enabled": False,   # автоматические напоминания просроченным
     "followup_days": 30,         # через сколько дней после отправки напоминать
     "interval_minutes": 15,      # как часто работает автопилот
 }
+
+# Автоопределение сервера по домену: пользователь вводит только адрес и пароль.
+PROVIDER_MAP: list[tuple[tuple[str, ...], dict[str, Any]]] = [
+    (("gmail.com", "googlemail.com"),
+     {"label": "Gmail", "host": "smtp.gmail.com", "port": 587, "ssl": False, "starttls": True,
+      "note": "Google не принимает обычный пароль: нужен «пароль приложения» "
+              "(myaccount.google.com/apppasswords), либо вход через Google."}),
+    (("yandex.ru", "ya.ru", "yandex.com", "yandex.by", "yandex.kz", "narod.ru"),
+     {"label": "Яндекс.Почта", "host": "smtp.yandex.ru", "port": 465, "ssl": True, "starttls": False,
+      "note": "Яндекс требует «пароль приложения» (id.yandex.ru → Безопасность → Пароли приложений)."}),
+    (("mail.ru", "bk.ru", "inbox.ru", "list.ru", "internet.ru"),
+     {"label": "Mail.ru", "host": "smtp.mail.ru", "port": 465, "ssl": True, "starttls": False,
+      "note": "Mail.ru требует пароль для внешнего приложения (Настройки → Безопасность)."}),
+    (("outlook.com", "hotmail.com", "live.com", "msn.com"),
+     {"label": "Outlook", "host": "smtp-mail.outlook.com", "port": 587, "ssl": False, "starttls": True,
+      "note": "Для Outlook нужен пароль приложения (включите двухэтапную проверку)."}),
+    (("icloud.com", "me.com", "mac.com"),
+     {"label": "iCloud", "host": "smtp.mail.me.com", "port": 587, "ssl": False, "starttls": True,
+      "note": "Для iCloud нужен пароль приложения из настроек Apple ID."}),
+    (("yahoo.com",),
+     {"label": "Yahoo", "host": "smtp.mail.yahoo.com", "port": 465, "ssl": True, "starttls": False,
+      "note": "Yahoo требует пароль приложения."}),
+    (("rambler.ru",),
+     {"label": "Rambler", "host": "smtp.rambler.ru", "port": 465, "ssl": True, "starttls": False, "note": ""}),
+    (("zoho.com", "zohomail.com"),
+     {"label": "Zoho", "host": "smtp.zoho.com", "port": 465, "ssl": True, "starttls": False, "note": ""}),
+]
+
+# SMTP-релеи: работают на порту 2525 (не блокируется бесплатным Render),
+# вход — обычные логин и пароль из кабинета провайдера.
+RELAY_PRESETS = [
+    {"id": "brevo-relay", "label": "Brevo SMTP (порт 2525)", "host": "smtp-relay.brevo.com", "port": 2525,
+     "ssl": False, "starttls": True,
+     "hint": "Логин — ваш email в Brevo, пароль — SMTP-ключ (Brevo → SMTP & API → SMTP)."},
+    {"id": "smtp2go", "label": "SMTP2GO (порт 2525)", "host": "mail.smtp2go.com", "port": 2525,
+     "ssl": False, "starttls": True,
+     "hint": "Логин и пароль — из SMTP Users в кабинете SMTP2GO (1000 писем в месяц бесплатно)."},
+    {"id": "sendgrid", "label": "SendGrid (порт 2525)", "host": "smtp.sendgrid.net", "port": 2525,
+     "ssl": False, "starttls": True,
+     "hint": "Логин всегда «apikey», пароль — API-ключ SendGrid."},
+]
 
 DEFAULT_SMTP = {
     "host": "",
@@ -54,7 +99,19 @@ SMTP_PRESETS = [
 
 
 def _defaults() -> dict[str, Any]:
-    return {"smtp": dict(DEFAULT_SMTP), "autopilot": dict(DEFAULT_AUTOPILOT)}
+    return {"smtp": dict(DEFAULT_SMTP), "autopilot": dict(DEFAULT_AUTOPILOT), "app": dict(DEFAULT_APP)}
+
+
+def detect_provider(email: str) -> dict[str, Any]:
+    """Сервер по домену адреса: пользователю не нужно знать хост и порт."""
+    domain = (email or "").split("@")[-1].strip().lower()
+    for domains, cfg in PROVIDER_MAP:
+        if domain in domains:
+            return {**cfg, "domain": domain, "known": True}
+    return {"label": domain or "свой сервер", "host": f"smtp.{domain}" if domain else "", "port": 587,
+            "ssl": False, "starttls": True, "domain": domain, "known": False,
+            "note": "Сервер определён по домену как smtp.<домен>:587 + STARTTLS. "
+                    "Если не подойдёт — укажите хост и порт вручную ниже."}
 
 
 def load(conn: sqlite3.Connection, vault: Vault) -> dict[str, Any]:
@@ -69,6 +126,7 @@ def load(conn: sqlite3.Connection, vault: Vault) -> dict[str, Any]:
             stored = json.loads(raw)
             data["smtp"].update({k: v for k, v in (stored.get("smtp") or {}).items() if k in DEFAULT_SMTP})
             data["autopilot"].update({k: v for k, v in (stored.get("autopilot") or {}).items() if k in DEFAULT_AUTOPILOT})
+            data["app"].update({k: v for k, v in (stored.get("app") or {}).items() if k in DEFAULT_APP})
         except Exception:  # noqa: BLE001 — повреждённые настройки не должны ломать приложение
             pass
     return data
@@ -78,6 +136,7 @@ def save(conn: sqlite3.Connection, vault: Vault, data: dict[str, Any]) -> dict[s
     current = load(conn, vault)
     current["smtp"].update({k: v for k, v in (data.get("smtp") or {}).items() if k in DEFAULT_SMTP})
     current["autopilot"].update({k: v for k, v in (data.get("autopilot") or {}).items() if k in DEFAULT_AUTOPILOT})
+    current["app"].update({k: v for k, v in (data.get("app") or {}).items() if k in DEFAULT_APP})
     import json
 
     blob = vault._fernet.encrypt(json.dumps(current, ensure_ascii=False).encode("utf-8"))  # noqa: SLF001
@@ -119,6 +178,31 @@ def effective_smtp(conn: sqlite3.Connection, vault: Vault) -> dict[str, Any]:
     return cfg
 
 
+def effective_dry_run(conn: sqlite3.Connection | None, vault: Vault | None, env_default: bool) -> bool:
+    """DRY_RUN: переключатель из интерфейса важнее переменной окружения."""
+    if conn is None or vault is None:
+        return env_default
+    try:
+        override = str(load(conn, vault)["app"].get("dry_run_override") or "").strip()
+    except Exception:  # noqa: BLE001
+        return env_default
+    if override in ("0", "1"):
+        return override == "1"
+    return env_default
+
+
+def quick_setup(email: str, password: str) -> dict[str, Any]:
+    """Простой вход: только адрес и пароль → готовый SMTP-конфиг."""
+    info = detect_provider(email)
+    smtp = {
+        "host": info["host"], "port": info["port"],
+        "user": (email or "").strip(), "password": password or "",
+        "from_addr": (email or "").strip(), "from_name": "DataCleaner",
+        "use_ssl": bool(info["ssl"]), "use_starttls": bool(info["starttls"]),
+    }
+    return {"smtp": smtp, "provider": info}
+
+
 def smtp_ready(cfg: dict[str, Any]) -> bool:
     return bool(cfg.get("host") and cfg.get("from_addr"))
 
@@ -146,5 +230,7 @@ def public_view(settings: dict[str, Any], smtp_effective: dict[str, Any], dry_ru
         },
         "dry_run": dry_run,
         "presets": SMTP_PRESETS,
+        "relay_presets": RELAY_PRESETS,
+        "app": {"dry_run_override": (settings.get("app") or {}).get("dry_run_override", "")},
         "transport": transport or {"kind": "none", "label": "не настроено", "notes": []},
     }

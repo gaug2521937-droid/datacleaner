@@ -437,10 +437,79 @@
     chip.className = 'status-chip ' + (on ? 'live' : '');
     chip.innerHTML = '<span class="dot"></span><span class="txt">' + (on ? 'включён' : 'выключен') + '</span>';
 
+    renderQuickLogin();
     renderGoogleCard();
     renderMailStatus();
     renderDryRunTip();
     renderPilotLog();
+  }
+
+  /* Простой вход: адрес + пароль. Сервер определяется по домену. */
+  function renderQuickLogin() {
+    if (!$('#quick-card')) return;
+    var s = state.settings || {};
+    var smtp = s.smtp || {};
+    var resolved = s.resolved || {};
+    var email = smtp.user || resolved.user || (state.profile && listOf(state.profile.emails)[0]) || '';
+    var emailEl = $('#quick-email');
+    if (emailEl && !emailEl.value) emailEl.value = email;
+    var stateEl = $('#quick-state');
+    if (resolved.ready) {
+      stateEl.className = 'pill ok';
+      stateEl.textContent = 'вход выполнен';
+    } else {
+      stateEl.className = 'pill acc';
+      stateEl.textContent = 'адрес + пароль';
+    }
+    updateQuickAutodetect();
+    renderSendMode();
+  }
+
+  function updateQuickAutodetect() {
+    var el = $('#quick-autodetect');
+    if (!el) return;
+    var email = clean($('#quick-email').value);
+    if (email.indexOf('@') === -1) { el.textContent = ''; return; }
+    var domain = email.split('@').pop().toLowerCase();
+    var map = {
+      'gmail.com': ['smtp.gmail.com', 587, 'STARTTLS', 'для Gmail нужен «пароль приложения» (Google не принимает обычный)'],
+      'googlemail.com': ['smtp.gmail.com', 587, 'STARTTLS', 'для Gmail нужен «пароль приложения»'],
+      'yandex.ru': ['smtp.yandex.ru', 465, 'SSL', 'Яндекс выдаёт «пароль приложения» в id.yandex.ru → Безопасность'],
+      'ya.ru': ['smtp.yandex.ru', 465, 'SSL', 'Яндекс выдаёт «пароль приложения» в id.yandex.ru → Безопасность'],
+      'mail.ru': ['smtp.mail.ru', 465, 'SSL', 'Mail.ru: Настройки → Безопасность → пароль для внешнего приложения'],
+      'bk.ru': ['smtp.mail.ru', 465, 'SSL', 'Mail.ru: пароль для внешнего приложения'],
+      'inbox.ru': ['smtp.mail.ru', 465, 'SSL', 'Mail.ru: пароль для внешнего приложения'],
+      'list.ru': ['smtp.mail.ru', 465, 'SSL', 'Mail.ru: пароль для внешнего приложения'],
+      'outlook.com': ['smtp-mail.outlook.com', 587, 'STARTTLS', 'нужен пароль приложения'],
+      'hotmail.com': ['smtp-mail.outlook.com', 587, 'STARTTLS', 'нужен пароль приложения'],
+      'icloud.com': ['smtp.mail.me.com', 587, 'STARTTLS', 'нужен пароль приложения Apple ID'],
+      'yahoo.com': ['smtp.mail.yahoo.com', 465, 'SSL', 'нужен пароль приложения'],
+      'rambler.ru': ['smtp.rambler.ru', 465, 'SSL', ''],
+      'zoho.com': ['smtp.zoho.com', 465, 'SSL', '']
+    };
+    var info = map[domain];
+    if (info) {
+      el.innerHTML = 'Определено: <b>' + esc(info[0]) + ':' + info[1] + '</b> (' + esc(info[2]) + ')' +
+        (info[3] ? ' · ' + esc(info[3]) : '');
+    } else {
+      el.innerHTML = 'Определено: <b>smtp.' + esc(domain) + ':587</b> (STARTTLS) — если не подойдёт, укажите сервер вручную ниже.';
+    }
+  }
+
+  function renderSendMode() {
+    if (!$('#send-mode-card')) return;
+    var s = state.settings || {};
+    var dry = s.dry_run;
+    var toggle = $('#send-mode-toggle');
+    var chip = $('#send-mode-state');
+    var label = $('#send-mode-label');
+    if (dry == null) dry = !!(state.serverMeta && state.serverMeta.dry_run);
+    toggle.checked = !dry;
+    chip.className = 'pill ' + (dry ? 'warn' : 'ok');
+    chip.textContent = dry ? 'выключена (DRY_RUN)' : 'включена';
+    label.textContent = dry
+      ? 'Отправлять письма по-настоящему'
+      : 'Письма уходят операторам — выключить';
   }
 
   /* Вход через Google: подключено / можно подключить / сервер не настроен */

@@ -794,6 +794,36 @@ body.modal-open .toasts{top:86px;bottom:auto}
 
     <div class="grid-2" style="align-items:start">
      <div class="stack">
+      <div class="card pad-lg" id="quick-card">
+        <div class="inline" style="justify-content:space-between;margin-bottom:2px">
+          <h3 style="margin:0">Просто войти в почту</h3>
+          <span class="pill acc" id="quick-state">адрес + пароль</span>
+        </div>
+        <p class="sub">Введите адрес почты и пароль — сервер и порт подберутся сами, вход проверим сразу.</p>
+        <div class="row">
+          <div class="field" style="margin-bottom:10px"><label for="quick-email">Почта</label>
+            <input id="quick-email" type="email" placeholder="you@gmail.com" autocomplete="username"></div>
+          <div class="field" style="margin-bottom:10px"><label for="quick-pass">Пароль</label>
+            <input id="quick-pass" type="password" placeholder="пароль от почты" autocomplete="current-password"></div>
+        </div>
+        <div class="inline">
+          <button class="btn primary" id="quick-connect">Войти и проверить</button>
+          <button class="btn ghost" id="quick-tip">Где взять пароль?</button>
+        </div>
+        <p class="tiny" style="margin:10px 0 0" id="quick-result"></p>
+        <p class="tiny" style="margin:6px 0 0" id="quick-autodetect"></p>
+      </div>
+
+      <div class="card pad-lg" id="send-mode-card">
+        <div class="inline" style="justify-content:space-between;margin-bottom:2px">
+          <h3 style="margin:0">Реальная отправка</h3>
+          <span class="pill warn" id="send-mode-state">выключена</span>
+        </div>
+        <p class="sub" style="margin-bottom:8px">Пока выключено — письма только собираются (DRY_RUN). Включите, когда почта подключена.</p>
+        <label class="switch"><input type="checkbox" id="send-mode-toggle"><span class="track"></span>
+          <span id="send-mode-label">Отправлять письма по-настоящему</span></label>
+      </div>
+
       <div class="card pad-lg" id="google-card">
         <div class="inline" style="justify-content:space-between;margin-bottom:4px">
           <h3 style="margin:0">Вход через Google</h3>

@@ -318,6 +318,103 @@
     return { smtp: smtp };
   }
 
+  /* -------------------- простой вход: адрес + пароль -------------------- */
+  function showPasswordHelp() {
+    openModal('Какой пароль вводить', '' +
+      '<p class="tiny">Приложение отправляет письма с вашего ящика. Провайдеры по-разному пускают такие подключения:</p>' +
+      '<div class="stack" style="gap:8px;margin:12px 0">' +
+      '<div class="dl"><span class="nm"><b>Gmail</b></span><span class="dt">пароль приложения</span></div>' +
+      '<div class="dl"><span class="nm"><b>Яндекс</b></span><span class="dt">пароль приложения</span></div>' +
+      '<div class="dl"><span class="nm"><b>Mail.ru / bk.ru / inbox.ru</b></span><span class="dt">пароль для внешнего приложения</span></div>' +
+      '<div class="dl"><span class="nm"><b>Outlook / Hotmail</b></span><span class="dt">пароль приложения</span></div>' +
+      '</div>' +
+      '<p class="tiny">Обычный пароль от почты эти сервисы не принимают — это их защита, обойти её нельзя. ' +
+      'Пароль приложения — не «мессенджер»: это 16 символов, которые выдаёт сам сервис за минуту.</p>' +
+      '<p class="tiny"><b>Ссылки:</b> ' +
+      '<a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener noreferrer">Gmail</a> · ' +
+      '<a href="https://id.yandex.ru/security/app-passwords" target="_blank" rel="noopener noreferrer">Яндекс</a> · ' +
+      '<a href="https://account.mail.ru/user/2-step-auth/passwords" target="_blank" rel="noopener noreferrer">Mail.ru</a> · ' +
+      '<a href="https://account.live.com/proofs/AppPassword" target="_blank" rel="noopener noreferrer">Outlook</a></p>' +
+      '<p class="tiny"><b>Совсем без паролей:</b> «Войти через Google» ниже — там вы вводите обычный пароль на странице Google, ' +
+      'а приложение получает только право отправлять письма.</p>', [
+        { label: 'Понятно', cls: 'primary', onClick: closeModal }
+      ]);
+  }
+
+  async function actQuickLogin() {
+    var email = clean($('#quick-email').value);
+    var pass = $('#quick-pass').value;
+    var out = $('#quick-result');
+    if (email.indexOf('@') === -1) { toast('Укажите полный адрес почты', 'warn'); return; }
+    if (!pass) { toast('Введите пароль', 'warn'); return; }
+    if (!state.server) {
+      if (out) out.textContent = 'В локальном режиме вход в почту недоступен: письма отправляются из вашего почтового клиента.';
+      toast('Это работает в серверной версии', 'warn', 7000);
+      return;
+    }
+    var btn = $('#quick-connect');
+    btn.disabled = true;
+    if (out) out.innerHTML = '<span class="muted">Проверяю вход…</span>';
+    try {
+      var res = await http('POST', 'api/settings/smtp/quick', { email: email, password: pass });
+      state.settings = res.settings || state.settings;
+      if (res.ok) {
+        $('#quick-pass').value = '';
+        if (out) out.innerHTML = '<span style="color:var(--mint)">' + esc(res.detail) + '</span>';
+        toast('Вход выполнен: ' + email, 'ok', 8000);
+      } else {
+        if (out) out.innerHTML = '<span style="color:#fda4af">' + esc(res.detail) + '</span>';
+        toast('Не удалось войти — смотрите подсказку под формой', 'bad', 10000);
+      }
+      renderQuickLogin(); renderMailStatus(); renderDryRunTip(); paintPilotStrip();
+    } catch (e) {
+      if (out) out.innerHTML = '<span style="color:#fda4af">' + esc(e.message) + '</span>';
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  async function actSendMode() {
+    var wantReal = this.checked;
+    if (wantReal) {
+      var ready = state.settings && state.settings.resolved && state.settings.resolved.ready;
+      if (!ready) {
+        this.checked = false;
+        toast('Сначала подключите почту: «Войти и проверить» или «Войти через Google»', 'warn', 8000);
+        return;
+      }
+      var self = this;
+      openModal('Включить реальную отправку?', '<p class="tiny">После включения автопилот начнёт <b>по-настоящему</b> ' +
+        'отправлять письма операторам и брокерам с вашего ящика. Ответственность за содержание и адресатов — на вас. ' +
+        'Выключить можно этим же переключателем.</p>', [
+        {
+          label: 'Включить отправку', cls: 'primary', icon: 'send', onClick: async function () {
+            closeModal();
+            try {
+              var res = await http('POST', 'api/settings/send-mode', { dry_run: false });
+              state.settings = res;
+              state.serverMeta = Object.assign({}, state.serverMeta, { dry_run: false });
+              renderSendMode(); renderDryRunTip(); paintPilotStrip();
+              toast('Реальная отправка включена', 'ok', 7000);
+            } catch (e) {
+              self.checked = false;
+              toast('Ошибка: ' + e.message, 'bad');
+            }
+          }
+        },
+        { label: 'Отмена', cls: 'ghost', onClick: function () { self.checked = false; closeModal(); } }
+      ]);
+      return;
+    }
+    try {
+      var resOff = await http('POST', 'api/settings/send-mode', { dry_run: true });
+      state.settings = resOff;
+      state.serverMeta = Object.assign({}, state.serverMeta, { dry_run: true });
+      renderSendMode(); renderDryRunTip(); paintPilotStrip();
+      toast('Отправка выключена: письма собираются, но не уходят', 'warn', 7000);
+    } catch (e) { toast('Ошибка: ' + e.message, 'bad'); }
+  }
+
   /* ------------------------- вход через Google (OAuth) ------------------------- */
   async function actGoogleConnect() {
     if (!state.server) {
@@ -1025,6 +1122,12 @@
     });
     $('#pilot-run').addEventListener('click', actRunPilot);
     $('#pilot-open').addEventListener('click', function () { navigate('autopilot'); });
+
+    $('#quick-connect').addEventListener('click', actQuickLogin);
+    $('#quick-tip').addEventListener('click', showPasswordHelp);
+    $('#quick-pass').addEventListener('keydown', function (e) { if (e.key === 'Enter') actQuickLogin(); });
+    $('#quick-email').addEventListener('input', updateQuickAutodetect);
+    $('#send-mode-toggle').addEventListener('change', actSendMode);
 
     $('#google-connect').addEventListener('click', actGoogleConnect);
     $('#google-disconnect').addEventListener('click', actGoogleDisconnect);

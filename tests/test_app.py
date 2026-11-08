@@ -665,3 +665,84 @@ def test_google_disconnect(monkeypatch):
     body = client.post("/api/mail/google/disconnect").json()
     assert body["ok"] is True
     assert client.get("/api/mail/google/status").json()["connected"] is False
+
+
+# -------------------------------------- простой вход: адрес + пароль, и переключатель отправки
+def test_detect_provider_by_domain():
+    from app import settings as settings_mod
+
+    assert settings_mod.detect_provider("ivan@gmail.com")["host"] == "smtp.gmail.com"
+    assert settings_mod.detect_provider("ivan@gmail.com")["port"] == 587
+    assert settings_mod.detect_provider("ivan@bk.ru")["host"] == "smtp.mail.ru"
+    assert settings_mod.detect_provider("ivan@yandex.ru")["ssl"] is True
+    unknown = settings_mod.detect_provider("ivan@firma.ru")
+    assert unknown["host"] == "smtp.firma.ru" and unknown["known"] is False
+
+
+def test_quick_login_requires_email_and_password():
+    assert client.post("/api/settings/smtp/quick", json={"email": "нет-собаки", "password": "x"}).json()["ok"] is False
+    body = client.post("/api/settings/smtp/quick", json={"email": "ivan@bk.ru", "password": ""}).json()
+    assert body["ok"] is False and "пароль" in body["detail"].lower()
+
+
+def test_quick_login_saves_detected_server(monkeypatch):
+    from app import mailer
+
+    monkeypatch.setattr(mailer, "verify_mail",
+                        lambda cfg, probe_to=None: {"ok": True, "transport": "smtp", "detail": "ok"})
+    body = client.post("/api/settings/smtp/quick", json={"email": "ivan@yandex.ru", "password": "app-pass"}).json()
+    assert body["ok"] is True
+    assert body["provider"]["host"] == "smtp.yandex.ru" and body["provider"]["port"] == 465
+    settings = client.get("/api/settings").json()["smtp"]
+    assert settings["user"] == "ivan@yandex.ru" and settings["has_password"] is True
+    assert "app-pass" not in str(body)  # пароль не возвращается
+
+
+def test_quick_login_explains_blocked_port(monkeypatch):
+    from app import mailer
+
+    monkeypatch.setattr(mailer, "verify_mail",
+                        lambda cfg, probe_to=None: {"ok": False, "transport": "smtp",
+                                                    "detail": "Не удалось подключиться к smtp.gmail.com:587 (Connection timed out)."})
+    body = client.post("/api/settings/smtp/quick", json={"email": "ivan@gmail.com", "password": "x"}).json()
+    assert body["ok"] is False
+    assert "2525" in body["detail"] and "Google" in body["detail"]
+
+
+def test_send_mode_switch_overrides_env(monkeypatch):
+    monkeypatch.setenv("DRY_RUN", "1")
+    assert client.get("/api/health").json()["dry_run"] is True
+
+    body = client.post("/api/settings/send-mode", json={"dry_run": False}).json()
+    assert body["ok"] is True and body["dry_run"] is False
+    assert client.get("/api/health").json()["dry_run"] is False
+    assert client.get("/api/settings").json()["dry_run"] is False
+
+    # в реальном режиме без почты письмо не уходит, но и не врёт про успех
+    rid = client.post("/api/requests", json={"broker_id": "ru-152-template"}).json()["request"]["id"]
+    sent = client.post(f"/api/requests/{rid}/send", json={}).json()
+    assert sent["ok"] is False and "Почта не настроена" in sent["detail"]
+
+    assert client.post("/api/settings/send-mode", json={"dry_run": True}).json()["dry_run"] is True
+    assert client.get("/api/health").json()["dry_run"] is True
+    assert client.post("/api/settings/send-mode", json={}).status_code == 422
+
+
+def test_quick_login_failure_keeps_previous_mail_settings(monkeypatch):
+    from app import mailer
+
+    # сначала — рабочий вход
+    monkeypatch.setattr(mailer, "verify_mail",
+                        lambda cfg, probe_to=None: {"ok": True, "transport": "smtp", "detail": "ok"})
+    assert client.post("/api/settings/smtp/quick",
+                       json={"email": "ivan@yandex.ru", "password": "app-pass"}).json()["ok"] is True
+
+    # затем — опечатка в пароле: старый рабочий вход должен остаться
+    monkeypatch.setattr(mailer, "verify_mail",
+                        lambda cfg, probe_to=None: {"ok": False, "transport": "smtp",
+                                                    "detail": "Сервер отклонил логин или пароль (535)."})
+    bad = client.post("/api/settings/smtp/quick", json={"email": "ivan@yandex.ru", "password": "опечатка"}).json()
+    assert bad["ok"] is False
+    smtp = client.get("/api/settings").json()["smtp"]
+    assert smtp["user"] == "ivan@yandex.ru" and smtp["has_password"] is True
+    assert "опечатка" not in str(bad)

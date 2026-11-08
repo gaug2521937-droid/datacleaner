@@ -226,7 +226,8 @@ def health(conn=Depends(get_db)) -> dict[str, Any]:
     mail_info = mailer.transport_info(smtp_cfg)
     return {
         "ok": True,
-        "dry_run": mailer.dry_run_enabled(),
+        "dry_run": (settings_mod.effective_dry_run(conn, Vault(), mailer.dry_run_enabled())
+                    if os.getenv("DATA_KEY") else mailer.dry_run_enabled()),
         "smtp_configured": smtp_ready,
         "mail_ready": mail_info["kind"] != "none",
         "mail_transport": mail_info["kind"],
@@ -427,7 +428,7 @@ def autosend(conn=Depends(get_db), vault: Vault = Depends(get_vault)) -> dict[st
         "failed": failed,
         "detail": (f"Отправлено: {len(sent)}; ошибок: {len(failed)}."
                    if sent or failed else "Черновиков нет — отправлять нечего."),
-        "dry_run": mailer.dry_run_enabled(),
+        "dry_run": effective_dry_run(conn, vault),
     }
 
 
@@ -591,6 +592,11 @@ def export_data(conn=Depends(get_db), vault: Vault = Depends(get_vault)) -> JSON
 
 
 # --- настройки: SMTP и автопилот ------------------------------------------
+def effective_dry_run(conn, vault: Vault) -> bool:
+    """DRY_RUN: переключатель из интерфейса важнее переменной окружения."""
+    return settings_mod.effective_dry_run(conn, vault, mailer.dry_run_enabled())
+
+
 def _mail_view(conn, vault: Vault, request: Request | None = None) -> dict[str, Any]:
     """Настройки + фактический транспорт почты (SMTP / Google / HTTPS-API)."""
     data = settings_mod.load(conn, vault)
@@ -600,7 +606,7 @@ def _mail_view(conn, vault: Vault, request: Request | None = None) -> dict[str, 
     base = str(request.base_url) if request is not None else "https://example.com/"
     return {
         **settings_mod.public_view(data, effective_full if token else effective,
-                                   mailer.dry_run_enabled(), mailer.transport_info(effective_full)),
+                                   effective_dry_run(conn, vault), mailer.transport_info(effective_full)),
         "google": google_oauth.status(conn, vault, base),
     }
 
@@ -616,6 +622,54 @@ def put_settings(payload: dict[str, Any], request: Request, conn=Depends(get_db)
     settings_mod.save(conn, vault, payload)
     return {"ok": True, "detail": "Настройки сохранены (пароль SMTP зашифрован).",
             **_mail_view(conn, vault, request)}
+
+
+@app.post("/api/settings/smtp/quick")
+def smtp_quick(payload: dict[str, Any], request: Request, conn=Depends(get_db),
+               vault: Vault = Depends(get_vault)) -> dict[str, Any]:
+    """Простой вход: пользователь вводит только адрес почты и пароль.
+
+    Сервер и порт определяются по домену. Сразу проверяем вход и говорим
+    результат человеческим языком.
+    """
+    email = str(payload.get("email") or "").strip()
+    password = str(payload.get("password") or "")
+    if "@" not in email:
+        return {"ok": False, "detail": "Укажите полный адрес почты, например ivan@gmail.com"}
+    if not password:
+        return {"ok": False, "detail": "Введите пароль почты (или «пароль приложения», если провайдер его требует)."}
+
+    prepared = settings_mod.quick_setup(email, password)
+    provider = prepared["provider"]
+    # Настройки сохраняем только после успешной проверки: неверный пароль не должен
+    # затирать уже работающую почту и делать вид, что отправка настроена.
+    previous = settings_mod.load(conn, vault)["smtp"]
+    settings_mod.save(conn, vault, {"smtp": prepared["smtp"]})
+    cfg = settings_mod.effective_smtp(conn, vault)
+    cfg["google_access"] = google_oauth.access_token(conn, vault)
+
+    result = mailer.verify_mail(cfg, probe_to=None)
+    if not result.get("ok"):
+        settings_mod.save(conn, vault, {"smtp": previous})
+        cfg = settings_mod.effective_smtp(conn, vault)
+        cfg["google_access"] = google_oauth.access_token(conn, vault)
+    hint = provider.get("note") or ""
+    if result.get("ok"):
+        detail = f"Вход выполнен: {email} через {provider['host']}:{provider['port']}. Письма готовы к отправке."
+    else:
+        detail = result.get("detail", "Не удалось войти")
+        if "отклонил логин" in detail or "535" in detail:
+            detail += " " + (hint or "")
+        if "Не удалось подключиться" in detail or "timeout" in detail.lower() or "timed out" in detail.lower():
+            detail += (" Похоже, хостинг блокирует этот порт. На бесплатном Render используйте SMTP-релей "
+                       "на порту 2525 (Brevo / SMTP2GO / SendGrid) или вход через Google.")
+    return {
+        "ok": bool(result.get("ok")),
+        "detail": detail,
+        "provider": {"label": provider["label"], "host": provider["host"], "port": provider["port"],
+                     "known": provider.get("known", False), "note": hint},
+        "settings": _mail_view(conn, vault, request),
+    }
 
 
 @app.post("/api/settings/smtp/test")
@@ -637,6 +691,24 @@ def smtp_test(payload: dict[str, Any] | None = None, conn=Depends(get_db),
     return {"ok": result["ok"], "detail": result["detail"], "dry_run": mailer.dry_run_enabled(),
             "transport": result.get("transport") or info["kind"],
             "host": cfg.get("host"), "port": cfg.get("port")}
+
+
+@app.post("/api/settings/send-mode")
+def set_send_mode(payload: dict[str, Any], request: Request, conn=Depends(get_db),
+                  vault: Vault = Depends(get_vault)) -> dict[str, Any]:
+    """Включает/выключает реальную отправку (DRY_RUN) без правки переменных окружения."""
+    if "dry_run" not in payload:
+        raise HTTPException(status_code=422, detail="Нужно поле dry_run: true|false")
+    override = "1" if bool(payload["dry_run"]) else "0"
+    settings_mod.save(conn, vault, {"app": {"dry_run_override": override}})
+    real = not bool(payload["dry_run"])
+    return {
+        "ok": True,
+        "detail": ("Реальная отправка включена: письма уйдут операторам." if real
+                   else "Отправка выключена: письма собираются, но не уходят."),
+        "dry_run": bool(payload["dry_run"]),
+        **_mail_view(conn, vault, request),
+    }
 
 
 @app.post("/api/autopilot/run")

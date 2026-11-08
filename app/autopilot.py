@@ -68,6 +68,8 @@ def send_one(conn, vault: Vault, request_id: int, dry_run: bool | None = None) -
     if row["status"] != "draft":
         return {"ok": False, "detail": "Это не черновик"}
 
+    if dry_run is None:
+        dry_run = settings_mod.effective_dry_run(conn, vault, mailer.dry_run_enabled())
     profile = _profile(conn, vault)
     subject = vault.decrypt_text(row["subject_enc"])
     body = vault.decrypt_text(row["body_enc"])
@@ -108,6 +110,8 @@ def send_followup(conn, vault: Vault, request_id: int, dry_run: bool | None = No
     if row["status"] not in ("sent", "refused"):
         return {"ok": False, "detail": "Напоминание отправляется только по запросам без ответа"}
 
+    if dry_run is None:
+        dry_run = settings_mod.effective_dry_run(conn, vault, mailer.dry_run_enabled())
     broker = {"id": row["broker_id"], "name": row["broker_name"], "language": row["language"],
               "email": row["to_email"]}
     profile = _profile(conn, vault)
@@ -149,7 +153,7 @@ def cycle(conn=None, vault: Vault | None = None, force: bool = False) -> dict[st
 
     def run(c):
         cfg = settings_mod.load(c, vault)["autopilot"]
-        dry = mailer.dry_run_enabled()
+        dry = settings_mod.effective_dry_run(c, vault, mailer.dry_run_enabled())
         smtp = _smtp(c, vault)
         if not mailer.mail_ready(smtp) and not dry:
             report["skipped"] = ("Почта не настроена и DRY_RUN выключен — отправлять нечем: "
@@ -161,7 +165,7 @@ def cycle(conn=None, vault: Vault | None = None, force: bool = False) -> dict[st
                     # пользователь отправляет его через форму на сайте
                     report["manual"].append({"id": row["id"], "broker": row["broker_name"]})
                     continue
-                res = send_one(c, vault, row["id"])
+                res = send_one(c, vault, row["id"], dry_run=dry)
                 (report["sent"] if res.get("ok") else report["errors"]).append(
                     {"id": row["id"], "broker": row["broker_name"], "detail": res.get("detail", "")[:160]})
         if cfg.get("followup_enabled") and not force:
@@ -173,7 +177,7 @@ def cycle(conn=None, vault: Vault | None = None, force: bool = False) -> dict[st
                 events = db.list_events(c, row["id"])
                 if any(e["type"] == FOLLOWUP_EVENT for e in events):
                     continue  # напоминание уже отправляли — не спамим
-                res = send_followup(c, vault, row["id"])
+                res = send_followup(c, vault, row["id"], dry_run=dry)
                 (report["followups"] if res.get("ok") else report["errors"]).append(
                     {"id": row["id"], "broker": row["broker_name"], "detail": res.get("detail", "")[:160]})
         return report
