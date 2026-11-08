@@ -213,10 +213,21 @@ def test_stats_counts_after_lifecycle():
     assert kpi["deletion_rate"] == 100.0
 
 
+def test_stats_kpi_has_all_fields_the_ui_expects():
+    """Фронтенд читает k.responded, k.drafts и др. — контракт должен совпадать."""
+    fields = {"total", "sent", "waiting", "overdue", "deleted", "responded",
+              "refused", "drafts", "deletion_rate", "response_rate",
+              "avg_response_days", "oldest_overdue_days"}
+    for body in (client.get("/api/stats").json(), client.post("/api/stats/demo").json()):
+        missing = fields - set(body["kpi"])
+        assert not missing, f"в KPI нет полей: {sorted(missing)}"
+
+
 def test_demo_stats_and_no_read_tracking_note():
     body = client.post("/api/stats/demo").json()
     assert body["demo"] is True
     assert body["kpi"]["total"] == 12
+    assert body["kpi"]["responded"] == 2  # в демо два запроса со статусом «Ответили»
     assert "Прочитано" in body["note"] or "прочитано" in body["note"]
     assert body["tips"]
 

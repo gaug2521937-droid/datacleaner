@@ -193,6 +193,7 @@ def compute_stats(
             "waiting": len(waiting),
             "overdue": len(overdue),
             "deleted": deleted_count,
+            "responded": stage_counts.get("responded", 0),
             "refused": stage_counts.get("refused", 0),
             "drafts": stage_counts.get("draft", 0),
             "deletion_rate": deletion_rate,
