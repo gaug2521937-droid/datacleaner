@@ -548,8 +548,8 @@
     } else {
       stateEl.className = 'pill neutral';
       stateEl.textContent = 'нужна настройка';
-      accEl.textContent = 'Вход через Google не настроен на сервере';
-      hintEl.textContent = 'нужны GOOGLE_CLIENT_ID и GOOGLE_CLIENT_SECRET';
+      accEl.textContent = 'Google не подключён: нужна настройка сервера';
+      hintEl.textContent = 'смотреть README §5a';
       connectBtn.textContent = 'Как включить';
       connectBtn.classList.add('primary');
       disconnectBtn.style.display = 'none';
