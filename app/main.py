@@ -237,7 +237,7 @@ def health(conn=Depends(get_db)) -> dict[str, Any]:
         "requests": len(db.list_requests(conn)),
         "auth_required": bool(ACCESS_TOKEN),
         "autopilot": autopilot_cfg,
-        "version": "1.1.0",
+        "version": "1.2.0",
         "today": date.today().isoformat(),
     }
 
@@ -658,11 +658,12 @@ def smtp_quick(payload: dict[str, Any], request: Request, conn=Depends(get_db),
         detail = f"Вход выполнен: {email} через {provider['host']}:{provider['port']}. Письма готовы к отправке."
     else:
         detail = result.get("detail", "Не удалось войти")
-        if "отклонил логин" in detail or "535" in detail:
-            detail += " " + (hint or "")
-        if "Не удалось подключиться" in detail or "timeout" in detail.lower() or "timed out" in detail.lower():
-            detail += (" Похоже, хостинг блокирует этот порт. На бесплатном Render используйте SMTP-релей "
-                       "на порту 2525 (Brevo / SMTP2GO / SendGrid) или вход через Google.")
+        # добираем подсказку только тем, чего в ответе ещё нет, — без повторов фраз
+        if ("отклонил логин" in detail or "535" in detail) and hint and hint not in detail:
+            detail += " " + hint
+        if ("Не удалось подключиться" in detail or "timed out" in detail.lower()) and "2525" not in detail:
+            detail += (" Хостинг блокирует этот порт: на бесплатном Render включите SMTP-релей "
+                       "на порту 2525 (Brevo / SMTP2GO / SendGrid) или «Войти через Google».")
     return {
         "ok": bool(result.get("ok")),
         "detail": detail,
