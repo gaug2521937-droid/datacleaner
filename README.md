@@ -330,6 +330,23 @@ SMTP-релей на 2525 (Brevo/SMTP2GO/SendGrid) или через Google OAut
   [настройках аккаунта Google](https://myaccount.google.com/permissions);
 * письма по-прежнему только `text/plain`, без пикселей и трекинга.
 
+**Если у вас уже есть client ID, а секрета нет.** `GOOGLE_CLIENT_ID` без `GOOGLE_CLIENT_SECRET`
+не работает: сервис честно показывает «нужна настройка» (`configured:false` в `/api/mail/google/status`).
+Секрет лежит в том же месте, где создавался клиент:
+
+1. [console.cloud.google.com/apis/credentials](https://console.cloud.google.com/apis/credentials) →
+   в разделе **OAuth 2.0 Client IDs** открыть клиент
+   `13344963095-…apps.googleusercontent.com`;
+2. справа — **Client secret** (`GOCSPX-…`), при необходимости **Add secret** / **Reset secret**;
+3. там же в **Authorized redirect URIs** добавить ровно
+   `https://datacleaner-st2u.onrender.com/api/mail/google/callback`;
+4. Render → **Environment** → `GOOGLE_CLIENT_SECRET` = `GOCSPX-…` → Save;
+5. `curl -H "X-Access-Token: …" https://datacleaner-st2u.onrender.com/api/mail/google/status`
+   → должно стать `"configured": true, "mode": "testing"`.
+
+Секрет — это пароль приложения OAuth: в чат и в репозиторий его писать не нужно, только в переменные
+окружения Render.
+
 Переменные: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `PUBLIC_BASE_URL`, опционально
 `GOOGLE_REFRESH_TOKEN` (если вход через браузер не нужен) и `GOOGLE_ACCESS_TOKEN` (для отладки).
 
