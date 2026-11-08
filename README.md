@@ -87,6 +87,7 @@ datacleaner/
 │   ├── build_html.py             сборка datacleaner.html и app/static/index.html
 │   ├── run_ui_server.sh          локальный сервер для UI-проверок (DRY_RUN=1, база в /tmp)
 │   ├── ui_smoke.py               дымовой UI-тест в Chromium (6 экранов + телефон 390 px)
+│   ├── live_check.py             проверка живого сайта на Render (код доступа — только из env)
 │   └── deploy_render.py          деплой на Render через REST API
 ├── screens/                      скриншоты интерфейса (десктоп и телефон)
 └── tests/
@@ -343,6 +344,8 @@ LLM_MODEL=gpt-6-luna
 - [ ] Автопроверка интерфейса: `bash tools/run_ui_server.sh &` затем `python3 tools/ui_smoke.py`
       → «ИТОГ: OK», скриншоты в `screens/`, ни одной ошибки JS и ни одной горизонтальной прокрутки
       на 390 px.
+- [ ] Проверка живого сайта: `DC_ACCESS_TOKEN=… python3 tools/live_check.py` → бейдж «сервер»,
+      самопроверка 22/22, потоковый ответ AI, телефон без переполнения.
 
 ---
 
